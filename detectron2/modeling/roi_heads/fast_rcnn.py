@@ -1,4 +1,8 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
+# @Author: Pieter Blok
+# @Date:   2021-03-25 17:14:37
+# @Last Modified by:   Pieter Blok
+# @Last Modified time: 2021-03-26 11:14:54
+
 import logging
 from typing import Dict, List, Tuple, Union
 import torch
@@ -50,6 +54,7 @@ def fast_rcnn_inference(
     score_thresh: float,
     nms_thresh: float,
     topk_per_image: int,
+    softmaxes: bool,
 ):
     """
     Call `fast_rcnn_inference_single_image` for all images.
@@ -78,7 +83,7 @@ def fast_rcnn_inference(
     """
     result_per_image = [
         fast_rcnn_inference_single_image(
-            boxes_per_image, scores_per_image, image_shape, score_thresh, nms_thresh, topk_per_image
+            boxes_per_image, scores_per_image, image_shape, score_thresh, nms_thresh, topk_per_image, softmaxes
         )
         for scores_per_image, boxes_per_image, image_shape in zip(scores, boxes, image_shapes)
     ]
@@ -122,6 +127,7 @@ def fast_rcnn_inference_single_image(
     score_thresh: float,
     nms_thresh: float,
     topk_per_image: int,
+    softmaxes: bool,
 ):
     """
     Single-image inference. Return bounding-box detection results by thresholding
@@ -156,18 +162,33 @@ def fast_rcnn_inference_single_image(
         boxes = boxes[filter_inds[:, 0], 0]
     else:
         boxes = boxes[filter_mask]
+
+    if softmaxes:
+        # check which softmax-ids have a True value, so that we can output the softmaxes of all classes
+        filter_rows = torch.any(filter_mask, axis=1)
+        softmax_scores = scores[filter_rows]
+        
+    # continue with the filtering of the scores
     scores = scores[filter_mask]
 
     # 2. Apply NMS for each class independently.
     keep = batched_nms(boxes, scores, filter_inds[:, 1], nms_thresh)
     if topk_per_image >= 0:
         keep = keep[:topk_per_image]
-    boxes, scores, filter_inds = boxes[keep], scores[keep], filter_inds[keep]
+
+    if softmaxes:
+        boxes, scores, filter_inds, softmax_scores = boxes[keep], scores[keep], filter_inds[keep], softmax_scores[keep]
+    else:
+        boxes, scores, filter_inds = boxes[keep], scores[keep], filter_inds[keep]
 
     result = Instances(image_shape)
     result.pred_boxes = Boxes(boxes)
     result.scores = scores
     result.pred_classes = filter_inds[:, 1]
+
+    if softmaxes:
+        result.softmaxes = softmax_scores
+        
     return result, filter_inds[:, 0]
 
 
@@ -349,6 +370,7 @@ class FastRCNNOutputLayers(nn.Module):
         smooth_l1_beta: float = 0.0,
         box_reg_loss_type: str = "smooth_l1",
         loss_weight: Union[float, Dict[str, float]] = 1.0,
+        softmaxes: bool = False,
     ):
         """
         NOTE: this interface is experimental.
@@ -394,6 +416,7 @@ class FastRCNNOutputLayers(nn.Module):
         if isinstance(loss_weight, float):
             loss_weight = {"loss_cls": loss_weight, "loss_box_reg": loss_weight}
         self.loss_weight = loss_weight
+        self.softmaxes = softmaxes
 
     @classmethod
     def from_config(cls, cfg, input_shape):
@@ -409,6 +432,7 @@ class FastRCNNOutputLayers(nn.Module):
             "test_topk_per_image"   : cfg.TEST.DETECTIONS_PER_IMAGE,
             "box_reg_loss_type"     : cfg.MODEL.ROI_BOX_HEAD.BBOX_REG_LOSS_TYPE,
             "loss_weight"           : {"loss_box_reg": cfg.MODEL.ROI_BOX_HEAD.BBOX_REG_LOSS_WEIGHT},
+            "softmaxes"             : cfg.MODEL.ROI_HEADS.SOFTMAXES,
             # fmt: on
         }
 
@@ -539,6 +563,7 @@ class FastRCNNOutputLayers(nn.Module):
             self.test_score_thresh,
             self.test_nms_thresh,
             self.test_topk_per_image,
+            self.softmaxes,
         )
 
     def predict_boxes_for_gt_classes(self, predictions, proposals):
