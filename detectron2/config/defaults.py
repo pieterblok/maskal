@@ -259,6 +259,7 @@ _C.MODEL.ROI_HEADS.IOU_LABELS = [0, 1]
 _C.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 512
 # Target fraction of RoI minibatch that is labeled foreground (i.e. class > 0)
 _C.MODEL.ROI_HEADS.POSITIVE_FRACTION = 0.25
+_C.MODEL.ROI_HEADS.SOFTMAXES = False
 
 # Only used on test mode
 
