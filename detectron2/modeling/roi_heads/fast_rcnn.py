@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 17:14:37
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-03-26 11:14:54
+# @Last Modified time: 2021-03-26 11:20:01
 
 import logging
 from typing import Dict, List, Tuple, Union
@@ -172,7 +172,8 @@ def fast_rcnn_inference_single_image(
     scores = scores[filter_mask]
 
     # 2. Apply NMS for each class independently.
-    keep = batched_nms(boxes, scores, filter_inds[:, 1], nms_thresh)
+    # keep = batched_nms(boxes, scores, filter_inds[:, 1], nms_thresh) ## do not apply NMS on classes
+    keep = batched_nms(boxes, scores, torch.zeros(scores.shape, dtype=int), nms_thresh) ## cross-class NMS (allowing only 1 detection per object)
     if topk_per_image >= 0:
         keep = keep[:topk_per_image]
 
