@@ -1,7 +1,7 @@
 ## Installation
 
-## 1.) Install CUDA 10.2 (if not yet installed) 
-Tested on: Ubuntu 18.04, CUDA: 10.2 (10.2.89)<br/> 
+## 1.) Install CUDA 10.1 (if not yet installed) 
+Tested on: Ubuntu 18.04, CUDA: 10.1 (10.1.105)<br/> 
 
 **1.1) Install NVIDIA drivers (using the terminal):** 
 - sudo add-apt-repository ppa:graphics-drivers/ppa
@@ -10,24 +10,25 @@ Tested on: Ubuntu 18.04, CUDA: 10.2 (10.2.89)<br/>
 - nvidia-smi
 - sudo reboot <br/> <br/>
 
-**1.2) Download and install CUDA 10.2:** 
-- wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-ubuntu1804.pin
-- sudo mv cuda-ubuntu1804.pin /etc/apt/preferences.d/cuda-repository-pin-600
-- wget https://developer.download.nvidia.com/compute/cuda/10.2/Prod/local_installers/cuda-repo-ubuntu1804-10-2-local-10.2.89-440.33.01_1.0-1_amd64.deb
-- sudo dpkg -i cuda-repo-ubuntu1804-10-2-local-10.2.89-440.33.01_1.0-1_amd64.deb
-- sudo apt-key add /var/cuda-repo-10-2-local-10.2.89-440.33.01/7fa2af80.pub
-- sudo apt-get update
-- sudo apt-get -y install cuda <br/> <br/>
+**1.2) Download CUDA 10.1:** 
+- download cuda 10.1: https://developer.nvidia.com/cuda-10.1-download-archive-base?target_os=Linux&target_arch=x86_64&target_distro=Ubuntu&target_version=1804&target_type=deblocal
+- download the deb file, for example: cuda-repo-ubuntu1804-10-1-local-10.1.105-418.39_1.0-1_amd64.deb <br/> <br/>
 
-**1.3) Set the environmental path:**
+**1.3) Install CUDA 10.1 (using the terminal, cd to the directory where the file has been downloaded):** 
+- sudo dpkg -i cuda-repo-ubuntu1804-10-1-local-10.1.105-418.39_1.0-1_amd64.deb
+- sudo apt-key add /var/cuda-repo-10-1-local-10.1.105-418.39/7fa2af80.pub
+- sudo apt-get update
+- sudo apt-get install cuda-toolkit-10-1 <br/> <br/>
+
+**1.4) Set the environmental path:**
 - sudo gedit ~/.bashrc
 - add the following 2 lines at the end of the bashrc file:
-export PATH=/usr/local/cuda-10.2/bin${PATH:+:${PATH}}
-export LD_LIBRARY_PATH=/usr/local/cuda-10.2/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+export PATH=/usr/local/cuda-10.1/bin${PATH:+:${PATH}}
+export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
 - save the bashrc file and close it
 - source ~/.bashrc <br/> <br/>
 
-**1.4) Check if CUDA has been installed properly:**
+**1.5) Check if CUDA has been installed properly:**
 - nvcc --version *(should the CUDA details)*<br/> <br/>
 
 
@@ -47,7 +48,7 @@ Tested with: Pytorch 1.8.0 and torchvision 0.9.0<br/>
 - cd maskAL <br/> <br/>
 
 **2.4) Install the required software libraries (in the maskAL virtual environment, using the terminal):**
-- pip install -U torch==1.8.0 torchvision==0.9.0 -f https://download.pytorch.org/whl/cu102/torch_stable.html
+- pip install -U torch==1.8.0 torchvision==0.9.0 -f https://download.pytorch.org/whl/cu101/torch_stable.html
 - pip install cython pyyaml==5.1
 - pip install -U 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'
 - pip install jupyter
