@@ -73,7 +73,7 @@ Tested with: Pytorch 1.8.0 and torchvision 0.9.0<br/>
 **2.6) Check if Pytorch links with CUDA (in the maskAL virtual environment, using the terminal):**
 - python
 - import torch
-- torch.version.cuda *(should print 10.2)*
+- torch.version.cuda *(should print 10.1)*
 - torch.cuda.is_available() *(should True)*
 - torch.cuda.get_device_name(0) *(should print the name of the first GPU)*
 - quit() <br/> <br/>
