@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-03-29 10:32:10
+# @Last Modified time: 2021-04-07 13:46:11
 
 import random
 import os
@@ -25,31 +25,7 @@ def list_files(annotdir):
         images.sort()
         annotations.sort()
 
-        img_basenames = [os.path.splitext(img)[0] for img in images]
-        annotation_basenames = [os.path.splitext(annot)[0] for annot in annotations]
-
-    return images, img_basenames, annotations, annotation_basenames
-
-
-def check_files(img_basenames, annotation_basenames):
-    activate_program = True
-    diff_img_annot = list(set(img_basenames) - set(annotation_basenames))
-    diff_annot_img = list(set(annotation_basenames) - set(img_basenames))
-
-    if len(diff_img_annot) > 0:
-        activate_program = False
-        print("These images do not have an annotation:")
-        for i in range(len(diff_img_annot)):
-            print(diff_img_annot[i])
-            
-    print("")
-    if len(diff_annot_img) > 0:
-        activate_program = False
-        print("These annotations do not have an image:")
-        for i in range(len(diff_annot_img)):
-            print(diff_annot_img[i])
-
-    return activate_program
+    return images, annotations
 
 
 def process_json(jsonfile, classnames):
@@ -338,36 +314,62 @@ def create_json(rootdir, imgdir, images, classes, name):
         json.dump(writedata, outfile)
 
 
+def check_json_presence(imgdir, dataset, name):
+    print("")
+    print("Checking {:s} annotations...".format(name))
+    all_images, annotations = list_files(imgdir)
+    img_basenames = [os.path.splitext(img)[0] for img in dataset]
+    annotation_basenames = [os.path.splitext(annot)[0] for annot in annotations]
+    
+    diff_img_annot = []
+    for c in range(len(img_basenames)):
+        img_basename = img_basenames[c]
+        if img_basename not in annotation_basenames:
+            diff_img_annot.append(img_basename)
+    diff_img_annot.sort()
+    
+    ii32 = np.iinfo(np.int32)
+    cur_annot_diff = ii32.max
+
+    while len(diff_img_annot) > 0:
+        all_images, annotations = list_files(imgdir)
+        img_basenames = [os.path.splitext(img)[0] for img in dataset]
+        annotation_basenames = [os.path.splitext(annot)[0] for annot in annotations]
+        
+        diff_img_annot = []
+        for c in range(len(img_basenames)):
+            img_basename = img_basenames[c]
+            if img_basename not in annotation_basenames:
+                diff_img_annot.append(img_basename)
+        diff_img_annot.sort()
+
+        if len(diff_img_annot) != cur_annot_diff:
+            print("Please annotate these images:")
+            for i in range(len(diff_img_annot)):
+                print(diff_img_annot[i])
+            cur_annot_diff = len(diff_img_annot)
+            print("")
+
+
 def prepare_initial_dataset(rootdir, imgdir, classes, train_val_test_split, initial_datasize):
-    images, img_basenames, annotations, annotation_basenames = list_files(imgdir)
+    images, annotations = list_files(imgdir)
     print("{:d} images found!".format(len(images)))
     print("{:d} annotations found!".format(len(annotations)))
 
-    activate_program = check_files(img_basenames, annotation_basenames)
+    datasets, names = split_datasets(rootdir, images, train_val_test_split, initial_datasize)
+    for dataset, name in zip(datasets, names):
+        check_json_presence(imgdir, dataset, name)
 
-    if activate_program:
-        print("Converting annotations...")
-        
-        datasets, names = split_datasets(rootdir, images, train_val_test_split, initial_datasize)
-
-        for dataset, name in zip(datasets, names):
-            create_json(rootdir, imgdir, dataset, classes, name)   
-
-    else:
-        print("")
-        print("Please update your images/annotations first!")
+    print("Converting annotations...")
+    for dataset, name in zip(datasets, names):
+        create_json(rootdir, imgdir, dataset, classes, name)   
 
 
 def update_train_dataset(rootdir, imgdir, classes, train_list):
-    images, img_basenames, annotations, annotation_basenames = list_files(imgdir)
+    images, annotations = list_files(imgdir)
     print("{:d} images found!".format(len(images)))
     print("{:d} annotations found!".format(len(annotations)))
 
-    activate_program = check_files(img_basenames, annotation_basenames)
-
-    if activate_program:
-        print("Converting annotations...")
-        create_json(rootdir, imgdir, train_list, classes, "train")
-    else:
-        print("")
-        print("Please update your images/annotations first!")
+    check_json_presence(imgdir, train_list, "train")
+    print("Converting annotations...")
+    create_json(rootdir, imgdir, train_list, classes, "train")
