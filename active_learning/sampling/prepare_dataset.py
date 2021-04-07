@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-04-07 13:46:11
+# @Last Modified time: 2021-04-07 17:36:21
 
 import random
 import os
@@ -330,10 +330,27 @@ def check_json_presence(imgdir, dataset, name):
     
     ii32 = np.iinfo(np.int32)
     cur_annot_diff = ii32.max
+    annot_folder = os.path.join(imgdir, "annotate")
 
+    ## copy the images that lack an annotation to the "annotate" subdirectory so that we can annotate them easily
+    if len(diff_img_annot) > 0:
+        annot_folder_present = os.path.isdir(annot_folder)
+        
+        if not annot_folder_present:
+            os.makedirs(annot_folder)
+        else:
+            shutil.rmtree(annot_folder)
+            os.makedirs(annot_folder)
+
+        for p in range(len(diff_img_annot)):
+            search_idx = img_basenames.index(diff_img_annot[p])
+            image_copy = dataset[search_idx]
+            shutil.copyfile(os.path.join(imgdir, image_copy), os.path.join(annot_folder, image_copy))
+
+    ## check whether all images have been annotated in the "annotate" subdirectory
     while len(diff_img_annot) > 0:
-        all_images, annotations = list_files(imgdir)
-        img_basenames = [os.path.splitext(img)[0] for img in dataset]
+        images, annotations = list_files(annot_folder)
+        img_basenames = [os.path.splitext(img)[0] for img in images]
         annotation_basenames = [os.path.splitext(annot)[0] for annot in annotations]
         
         diff_img_annot = []
@@ -343,12 +360,25 @@ def check_json_presence(imgdir, dataset, name):
                 diff_img_annot.append(img_basename)
         diff_img_annot.sort()
 
-        if len(diff_img_annot) != cur_annot_diff:
-            print("Please annotate these images:")
-            for i in range(len(diff_img_annot)):
-                print(diff_img_annot[i])
-            cur_annot_diff = len(diff_img_annot)
-            print("")
+        if len(diff_img_annot) > 0:
+            if len(diff_img_annot) != cur_annot_diff:
+                print("Go to the folder {:s}".format(annot_folder))
+                print("and annotate the following images:")
+                for i in range(len(diff_img_annot)):
+                    print(diff_img_annot[i])
+                cur_annot_diff = len(diff_img_annot)
+                print("")
+
+    ## copy the annotations back to the imgdir
+    images, annotations = list_files(annot_folder)
+    for a in range(len(annotations)):
+        annotation = annotations[a]
+        shutil.copyfile(os.path.join(annot_folder, annotation), os.path.join(imgdir, annotation))
+
+    ## remove the annotation-folder again
+    annot_folder_present = os.path.isdir(annot_folder)
+    if annot_folder_present:
+        shutil.rmtree(annot_folder)
 
 
 def prepare_initial_dataset(rootdir, imgdir, classes, train_val_test_split, initial_datasize):
