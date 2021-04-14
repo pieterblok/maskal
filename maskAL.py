@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-03-29 20:45:21
+# @Last Modified time: 2021-04-06 20:16:01
 
 ## Active learning with Mask R-CNN
 
@@ -57,6 +57,37 @@ def check_direxcist(dir):
             os.makedirs(dir)  # make new folder
 
 
+def remove_initial_training_set(dataroot):
+    if os.path.exists(os.path.join(dataroot, "initial_train.txt")):
+        os.remove(os.path.join(dataroot, "initial_train.txt"))
+
+
+def init_folders_and_files(strategies):
+    weightsfolders = []
+    resultsfolders = []
+    csv_names = []
+
+    for strat in range(len(strategies)):
+        strategy = strategies[strat]
+        weightsfolder = os.path.join(weightsroot, strategy)
+        check_direxcist(weightsfolder)
+        weightsfolders.append(weightsfolder)
+        
+        resultsfolder = os.path.join(resultsroot, strategy)
+        check_direxcist(resultsfolder)
+        resultsfolders.append(resultsfolder)
+
+        segm_strings = [c.replace(c, 'mAP-' + c) for c in classes]
+        write_strings = ['train_size', 'mAP'] + segm_strings
+        csv_name = strategy + '.csv'
+        csv_names.append(csv_name)
+
+        with open(os.path.join(resultsfolder, csv_name), 'w', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            csvwriter.writerow(write_strings)
+
+    return weightsfolders, resultsfolders, csv_names
+
 
 def Train_Eval(dataroot, imgdir, classes, weightsfolder, resultsfolder, csv_name, init):
     ## CustomTrainer with evaluator
@@ -108,20 +139,19 @@ def Train_Eval(dataroot, imgdir, classes, weightsfolder, resultsfolder, csv_name
     cfg.SOLVER.WARMUP_ITERS = 1000
     cfg.SOLVER.MAX_ITER = 5000
     cfg.SOLVER.STEPS = (1000, 3000, 4000)
-    cfg.SOLVER.CHECKPOINT_PERIOD = 5000
+    cfg.SOLVER.CHECKPOINT_PERIOD = 5001
     cfg.TEST.EVAL_PERIOD = 1000
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = len(classes)
     cfg.OUTPUT_DIR = weightsfolder
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
-    trainer = CustomTrainer(cfg) 
+    trainer = CustomTrainer(cfg)
     trainer.resume_or_load(resume=False)
     trainer.train()
-
 
     ## evaluation
     trainer.resume_or_load(resume=True)
     cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")
-    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.8   # set the testing threshold for this model
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5   # set the testing threshold for this model
     cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.01
     cfg.DATASETS.TEST = ("test",)
     predictor = DefaultPredictor(cfg)
@@ -147,22 +177,23 @@ dataroot = "./datasets"
 imgdir = "./datasets/rgb_annotated"
 
 classes = ['broccoli', 'damaged', 'matured', 'cateye', 'headrot']
-train_val_test_split = [0.8, 0.1, 0.1]
-strategies = ['active_learning', 'random']
+train_val_test_split = [0.9, 0.05, 0.05]
+strategies = ['uncertainty', 'certainty', 'random']
+weightsfolders, resultsfolders, csv_names = init_folders_and_files(strategies)
+remove_initial_training_set(dataroot)
 
 initial_datasize = 50
-pool_size = 50
-loops = 9
-
-if os.path.exists(os.path.join(dataroot, "initial_train.txt")):
-    os.remove(os.path.join(dataroot, "initial_train.txt"))
+pool_size = 25
+loops = 8
+iterations = 5
+batch_size = 5
+iou_thres = 0.5
 
 for strat in range(len(strategies)):
     strategy = strategies[strat]
-    weightsfolder = os.path.join(weightsroot, strategy)
-    resultsfolder = os.path.join(resultsroot, strategy)
-    check_direxcist(weightsfolder)
-    check_direxcist(resultsfolder)
+    weightsfolder = weightsfolders[strat]
+    resultsfolder = resultsfolders[strat]
+    csv_name = csv_names[strat]
 
     if not os.path.exists(os.path.join(dataroot, "initial_train.txt")):
         prepare_initial_dataset(dataroot, imgdir, classes, train_val_test_split, initial_datasize)
@@ -171,13 +202,6 @@ for strat in range(len(strategies)):
         initial_train_names = initial_train_file.readlines()
         initial_train_names = [initial_train_names[i].rstrip('\n') for i in range(len(initial_train_names))]
         update_train_dataset(dataroot, imgdir, classes, initial_train_names)
-
-    segm_strings = [c.replace(c, 'mAP-' + c) for c in classes]
-    write_strings = ['train_size', 'mAP'] + segm_strings
-    csv_name = strategy + '.csv'
-    with open(os.path.join(resultsfolder, csv_name), 'w', newline='') as csvfile:
-        csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
-        csvwriter.writerow(write_strings)
 
     ## perform the training on the initial dataset
     if strat == 0:
@@ -195,11 +219,7 @@ for strat in range(len(strategies)):
         all_train_names = [all_train_names[i].rstrip('\n') for i in range(len(all_train_names))]
         pool_list = list(set(all_train_names) - set(train_names))
 
-        if strategy == 'active_learning':
-            iterations = 5
-            batch_size = 5
-            iou_thres = 0.5
-
+        if strategy == 'uncertainty':
             cfg.MODEL.ROI_HEADS.SOFTMAXES = True
             predictor = MonteCarloDropout(cfg, iterations, batch_size)
             device = cfg.MODEL.DEVICE
@@ -230,10 +250,44 @@ for strat in range(len(strategies)):
 
                 ## update the training list and retrain the algorithm
                 train_list = train_names + list(pool.keys())
-
                 update_train_dataset(dataroot, imgdir, classes, train_list)
                 cfg, dataset_dicts_train = Train_Eval(dataroot, imgdir, classes, weightsfolder, resultsfolder, csv_name, init=False)
-                
+            else:
+                print("All images are used for the training, stopping the program...")
+
+        if strategy == 'certainty':
+            cfg.MODEL.ROI_HEADS.SOFTMAXES = True
+            predictor = MonteCarloDropout(cfg, iterations, batch_size)
+            device = cfg.MODEL.DEVICE
+
+            if len(pool_list) > 0:
+                ## find the images from the pool_list the algorithm is most uncertain about
+                for d in tqdm(range(len(pool_list))):
+                    filename = pool_list[d]
+                    img = cv2.imread(os.path.join(imgdir, filename))
+                    width, height = img.shape[:-1]
+                    outputs = predictor(img)
+
+                    obs = observations(outputs, iou_thres)
+                    img_uncertainty = uncertainty(obs, iterations, width, height, device) ## reduce the iterations when facing a "CUDA out of memory" error
+
+                    if len(pool) < pool_size:
+                        pool[filename] = float(img_uncertainty)
+                    else:
+                        min_id, min_val = min(pool.items(), key=operator.itemgetter(1))
+                        if float(img_uncertainty) > min_val:
+                            del pool[min_id]
+                            pool[filename] = float(img_uncertainty)
+
+                sorted_pool = sorted(pool.items(), key=operator.itemgetter(1))
+                pool = {}
+                for k, v in sorted_pool:
+                    pool[k] = v    
+
+                ## update the training list and retrain the algorithm
+                train_list = train_names + list(pool.keys())
+                update_train_dataset(dataroot, imgdir, classes, train_list)
+                cfg, dataset_dicts_train = Train_Eval(dataroot, imgdir, classes, weightsfolder, resultsfolder, csv_name, init=False)
             else:
                 print("All images are used for the training, stopping the program...")
 
@@ -241,7 +295,6 @@ for strat in range(len(strategies)):
             if len(pool_list) > 0:
                 sample_list = random.choices(pool_list, k=pool_size)
                 train_list = train_names + sample_list
-
                 update_train_dataset(dataroot, imgdir, classes, train_list)
                 cfg, dataset_dicts_train = Train_Eval(dataroot, imgdir, classes, weightsfolder, resultsfolder, csv_name, init=False)
             else:
