@@ -5,7 +5,7 @@ Active learning automatically selects the most-informative images to annotate an
 1. Train an algorithm on a small subset of a bigger dataset
 2. Infer the trained algorithm on the remaining dataset, and select the most-informative images with a sampling algorithm
 3. Annotate the most-informative images, and then retrain the algorithm on the most informative-images
-4. Repeat step 1-3 until the desired performance is reached (or we you are tired of doing annotations) <br/><br/>
+4. Repeat step 1-3 until the desired performance is reached (or when you are tired of doing annotations) <br/><br/>
 
 ## Installation of the software
 See [INSTALL.md](../INSTALL.md)
