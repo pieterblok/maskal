@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-04-07 17:36:21
+# @Last Modified time: 2021-04-16 17:25:42
 
 import random
 import os
@@ -369,16 +369,17 @@ def check_json_presence(imgdir, dataset, name):
                 cur_annot_diff = len(diff_img_annot)
                 print("")
 
-    ## copy the annotations back to the imgdir
-    images, annotations = list_files(annot_folder)
-    for a in range(len(annotations)):
-        annotation = annotations[a]
-        shutil.copyfile(os.path.join(annot_folder, annotation), os.path.join(imgdir, annotation))
+    if os.path.isdir(annot_folder):
+        ## copy the annotations back to the imgdir
+        images, annotations = list_files(annot_folder)
+        for a in range(len(annotations)):
+            annotation = annotations[a]
+            shutil.copyfile(os.path.join(annot_folder, annotation), os.path.join(imgdir, annotation))
 
-    ## remove the annotation-folder again
-    annot_folder_present = os.path.isdir(annot_folder)
-    if annot_folder_present:
-        shutil.rmtree(annot_folder)
+        ## remove the annotation-folder again
+        annot_folder_present = os.path.isdir(annot_folder)
+        if annot_folder_present:
+            shutil.rmtree(annot_folder)
 
 
 def prepare_initial_dataset(rootdir, imgdir, classes, train_val_test_split, initial_datasize):
