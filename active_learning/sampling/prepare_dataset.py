@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-04-26 14:06:40
+# @Last Modified time: 2021-04-26 17:06:02
 
 import random
 import os
@@ -13,19 +13,45 @@ import math
 import datetime
 import time
 from tqdm import tqdm
+import xmltodict
 
 supported_cv2_formats = (".bmp", ".dib", ".jpeg", ".jpg", ".jpe", ".jp2", ".png", ".pbm", ".pgm", ".ppm", ".sr", ".ras", ".tiff", ".tif")
 
 
 def list_files(annotdir):
+    images = []
+    annotations = []
+    
     if os.path.isdir(annotdir):
         all_files = os.listdir(annotdir)
         images = [x for x in all_files if x.lower().endswith(supported_cv2_formats)]
-        annotations = [x for x in all_files if ".json" in x]
+        annotations = [x for x in all_files if ".json" in x or ".xml" in x]
         images.sort()
         annotations.sort()
 
     return images, annotations
+
+
+def rename_xml_files(annotdir):
+    if os.path.isdir(annotdir): 
+        all_files = os.listdir(annotdir)
+        annotations = [x for x in all_files if ".json" in x or ".xml" in x]
+        
+        for a in range(len(annotations)):
+            annotation = annotations[a]
+            if annotation.endswith(".xml"):
+                if "item_" in annotation:
+                    with open(os.path.join(annotdir, annotation)) as xml_file:
+                        data_dict = xmltodict.parse(xml_file.read())
+                        xml_file.close()
+                        json_data = json.dumps(data_dict)
+                        json_data = json.loads(json_data)
+                        
+                        img_name = json_data['annotation']['filename']
+                        file_ext = os.path.splitext(img_name)[1]
+                        xml_name = img_name.replace(file_ext, '.xml')
+
+                        os.rename(os.path.join(annotdir, annotation), os.path.join(annotdir, xml_name))
 
 
 def process_labelme_json(jsonfile, classnames):
@@ -201,6 +227,108 @@ def process_darwin_json(jsonfile, classnames):
     return category_ids, masks, crowd_ids, status
 
 
+def process_cvat_xml(xmlfile, classnames):
+    group_ids = []
+
+    with open(xmlfile) as xml_file:
+        data_dict = xmltodict.parse(xml_file.read())
+        xml_file.close()
+        data = json.dumps(data_dict)
+        data = json.loads(data)
+
+    group_ids = []
+
+    ## if 'object' is a list, then there are multiple masks
+    if isinstance(data['annotation']['object'], list):
+        for q in range(len(data['annotation']['object'])):
+            obj = data['annotation']['object'][q]
+
+            if obj['parts']['ispartof'] is not None:
+                group_ids.append(int(obj['parts']['ispartof']))
+            else:
+                group_ids.append(int(obj['id']))
+
+    ## if 'object' is a dict, then it only has 1 mask  
+    if isinstance(data['annotation']['object'], dict):
+        obj = data['annotation']['object']
+        group_ids.append(int(obj['id']))            
+            
+    unique_group_ids = list(set(group_ids))
+    total_masks = len(unique_group_ids)
+
+    category_ids = []
+    masks = []
+    crowd_ids = []
+
+    for i in range(total_masks):
+        category_ids.append([])
+        masks.append([])
+        crowd_ids.append([])
+
+    ## if 'object' is a list, then there are multiple masks
+    if isinstance(data['annotation']['object'], list):
+        for p in range(len(data['annotation']['object'])):
+            obj = data['annotation']['object'][p]
+            fill_id = group_ids[p]
+            classname = obj['name']
+
+            try:
+                category_id = int(np.where(np.asarray(classnames) == classname)[0][0] + 1)
+                category_ids[fill_id] = category_id
+                run_further = True
+            except:
+                print("Cannot find the class name (please check the annotation files)")
+                run_further = False
+
+            if run_further:
+                if 'polygon' in obj:
+                    if 'pt' in obj['polygon']:
+                        points = []
+                        path_points = obj['polygon']['pt']
+                        for h in range(len(path_points)):
+                            points.append(float(path_points[h]['x']))
+                            points.append(float(path_points[h]['y']))
+
+                        masks[fill_id].append(points)
+
+                crowd_ids[fill_id] = 0
+                status = "successful"
+            else:
+                status = "unsuccessful"
+
+    ## if 'object' is a dict, then it only has 1 mask  
+    if isinstance(data['annotation']['object'], dict):
+        obj = data['annotation']['object']
+        fill_id = 0
+        classname = obj['name']
+
+        try:
+            category_id = int(np.where(np.asarray(classnames) == classname)[0][0] + 1)
+            category_ids[fill_id] = category_id
+            run_further = True
+        except:
+            print("Cannot find the class name (please check the annotation files)")
+            run_further = False
+
+        if run_further:
+            if 'polygon' in obj:
+                if 'pt' in obj['polygon']:
+                    points = []
+                    path_points = obj['polygon']['pt']
+                    for h in range(len(path_points)):
+                        points.append(float(path_points[h]['x']))
+                        points.append(float(path_points[h]['y']))
+
+                    masks[fill_id].append(points)
+
+            crowd_ids[fill_id] = 0
+            status = "successful"
+        else:
+            status = "unsuccessful"
+
+    return category_ids, masks, crowd_ids, status
+
+
 def bounding_box(masks):
     areas = []
     boxes = []
@@ -334,30 +462,54 @@ def create_json(rootdir, imgdir, images, classes, name):
             date_modified = None
 
         basename, fileext = os.path.splitext(imgname)
-        json_name = basename.split(fileext)
-        jn = json_name[0]+'.json'
-        json_filename = os.path.join(imgdir, jn)
+        base_name = basename.split(fileext)
+        bn = base_name[0]
 
         write = False
-        with open(json_filename, 'r') as json_file:
-            try:
-                data = json.load(json_file)
+        file_is_json = False
+        file_is_xml = False
 
-                ## labelme
-                if 'version' in data and 'shapes' in data:
-                    if len(data['shapes']) > 0:
-                        annot_format = 'labelme'
-                        write = True
-
-                ## v7-darwin                
-                if 'annotations' in data:
-                    if len(data['annotations']) > 0:
-                        annot_format = 'darwin'
-                        write = True
-            except:
-                continue
+        if os.path.exists(os.path.join(imgdir, bn + ".json")):
+            file_is_json = True
+            annot_filename = os.path.join(imgdir, bn + ".json")
             
+        if os.path.exists(os.path.join(imgdir, bn + ".xml")):
+            file_is_xml = True
+            annot_filename = os.path.join(imgdir, bn + ".xml")
 
+        if file_is_json:
+            with open(annot_filename, 'r') as json_file:
+                try:
+                    data = json.load(json_file)
+
+                    ## labelme
+                    if 'version' in data and 'shapes' in data:
+                        if len(data['shapes']) > 0:
+                            annot_format = 'labelme'
+                            write = True
+
+                    ## v7-darwin                
+                    if 'annotations' in data:
+                        if len(data['annotations']) > 0:
+                            annot_format = 'darwin'
+                            write = True
+                except:
+                    continue
+
+        if file_is_xml:
+            with open(annot_filename) as xml_file:
+                data_dict = xmltodict.parse(xml_file.read())
+                xml_file.close()
+                data = json.dumps(data_dict)
+                data = json.loads(data)
+
+                ## cvat-labelme3.0 xml files
+                if 'annotation' in data:
+                    if 'object' in data['annotation']:
+                        annot_format = 'cvat'
+                        write = True
+            
+        
         if write:
             writedata['images'].append({
                             'license': 0,
@@ -371,10 +523,13 @@ def create_json(rootdir, imgdir, images, classes, name):
 
             # Procedure to store the annotations in the final JSON file
             if annot_format == 'labelme':
-                category_ids, masks, crowd_ids, status = process_labelme_json(json_filename, classes)
+                category_ids, masks, crowd_ids, status = process_labelme_json(annot_filename, classes)
             
             if annot_format == 'darwin':
-                category_ids, masks, crowd_ids, status = process_darwin_json(json_filename, classes)
+                category_ids, masks, crowd_ids, status = process_darwin_json(annot_filename, classes)
+
+            if annot_format == 'cvat':
+                category_ids, masks, crowd_ids, status = process_cvat_xml(annot_filename, classes)
 
             areas, boxes = bounding_box(masks)
             img_vis = visualize(img, category_ids, masks, boxes, classes)
@@ -405,6 +560,7 @@ def create_json(rootdir, imgdir, images, classes, name):
 def check_json_presence(imgdir, dataset, name):
     print("")
     print("Checking {:s} annotations...".format(name))
+    rename_xml_files(imgdir)
     all_images, annotations = list_files(imgdir)
     img_basenames = [os.path.splitext(img)[0] for img in dataset]
     annotation_basenames = [os.path.splitext(annot)[0] for annot in annotations]
@@ -437,6 +593,7 @@ def check_json_presence(imgdir, dataset, name):
 
     ## check whether all images have been annotated in the "annotate" subdirectory
     while len(diff_img_annot) > 0:
+        rename_xml_files(annot_folder)
         images, annotations = list_files(annot_folder)
         img_basenames = [os.path.splitext(img)[0] for img in images]
         annotation_basenames = [os.path.splitext(annot)[0] for annot in annotations]
@@ -459,6 +616,7 @@ def check_json_presence(imgdir, dataset, name):
 
     if os.path.isdir(annot_folder):
         ## copy the annotations back to the imgdir
+        rename_xml_files(annot_folder)
         images, annotations = list_files(annot_folder)
         for a in range(len(annotations)):
             annotation = annotations[a]
@@ -472,6 +630,7 @@ def check_json_presence(imgdir, dataset, name):
 
 
 def prepare_initial_dataset(rootdir, imgdir, classes, train_val_test_split, initial_datasize):
+    rename_xml_files(imgdir)
     images, annotations = list_files(imgdir)
     print("{:d} images found!".format(len(images)))
     print("{:d} annotations found!".format(len(annotations)))
@@ -486,6 +645,7 @@ def prepare_initial_dataset(rootdir, imgdir, classes, train_val_test_split, init
 
 
 def update_train_dataset(rootdir, imgdir, classes, train_list):
+    rename_xml_files(imgdir)
     images, annotations = list_files(imgdir)
     print("{:d} images found!".format(len(images)))
     print("{:d} annotations found!".format(len(annotations)))
