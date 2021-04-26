@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-04-16 17:25:42
+# @Last Modified time: 2021-04-26 14:06:40
 
 import random
 import os
@@ -28,7 +28,7 @@ def list_files(annotdir):
     return images, annotations
 
 
-def process_json(jsonfile, classnames):
+def process_labelme_json(jsonfile, classnames):
     group_ids = []
 
     with open(jsonfile, 'r') as json_file:
@@ -137,6 +137,66 @@ def process_json(jsonfile, classnames):
             status = "successful"
         else:
             status = "unsuccessful"
+
+    return category_ids, masks, crowd_ids, status
+
+
+def process_darwin_json(jsonfile, classnames):
+    
+    with open(jsonfile, 'r') as json_file:
+        data = json.load(json_file)
+
+    total_masks = len(data['annotations'])
+    category_ids = []
+    masks = []
+    crowd_ids = []
+
+    for i in range(total_masks):
+        category_ids.append([])
+        masks.append([])
+        crowd_ids.append([])
+
+    fill_id = 0 
+
+    for p in data['annotations']:
+        classname = p['name']
+
+        try:
+            category_id = int(np.where(np.asarray(classnames) == classname)[0][0] + 1)
+            category_ids[fill_id] = category_id
+            run_further = True
+        except:
+            print("Cannot find the class name (please check the annotation files)")
+            run_further = False
+
+        if run_further:
+            if 'polygon' in p:
+                if 'path' in p['polygon']:
+                    points = []
+                    path_points = p['polygon']['path']
+                    for h in range(len(path_points)):
+                        points.append(path_points[h]['x'])
+                        points.append(path_points[h]['y'])
+
+                    masks[fill_id].append(points)
+
+            if 'complex_polygon' in p:
+                if 'path' in p['complex_polygon']:
+                    for k in range(len(p['complex_polygon']['path'])):
+                        points = []
+                        path_points = p['complex_polygon']['path'][k]
+                        for h in range(len(path_points)):
+                            points.append(path_points[h]['x'])
+                            points.append(path_points[h]['y'])
+
+                        masks[fill_id].append(points)
+                    
+            crowd_ids[fill_id] = 0
+            status = "successful"
+        else:
+            status = "unsuccessful"
+
+        fill_id += 1
 
     return category_ids, masks, crowd_ids, status
 
@@ -276,39 +336,67 @@ def create_json(rootdir, imgdir, images, classes, name):
         basename, fileext = os.path.splitext(imgname)
         json_name = basename.split(fileext)
         jn = json_name[0]+'.json'
-        
-        writedata['images'].append({
-                        'license': 0,
-                        'url': None,
-                        'file_name': imgname,
-                        'height': height,
-                        'width': width,
-                        'date_captured': None,
-                        'id': j
+        json_filename = os.path.join(imgdir, jn)
+
+        write = False
+        with open(json_filename, 'r') as json_file:
+            try:
+                data = json.load(json_file)
+
+                ## labelme
+                if 'version' in data and 'shapes' in data:
+                    if len(data['shapes']) > 0:
+                        annot_format = 'labelme'
+                        write = True
+
+                ## v7-darwin                
+                if 'annotations' in data:
+                    if len(data['annotations']) > 0:
+                        annot_format = 'darwin'
+                        write = True
+            except:
+                continue
+            
+
+        if write:
+            writedata['images'].append({
+                            'license': 0,
+                            'url': None,
+                            'file_name': imgname,
+                            'height': height,
+                            'width': width,
+                            'date_captured': None,
+                            'id': j
+                        })
+
+            # Procedure to store the annotations in the final JSON file
+            if annot_format == 'labelme':
+                category_ids, masks, crowd_ids, status = process_labelme_json(json_filename, classes)
+            
+            if annot_format == 'darwin':
+                category_ids, masks, crowd_ids, status = process_darwin_json(json_filename, classes)
+
+            areas, boxes = bounding_box(masks)
+            img_vis = visualize(img, category_ids, masks, boxes, classes)
+
+            for q in range(len(category_ids)):
+                category_id = category_ids[q]
+                mask = masks[q]
+                bb_area = areas[q]
+                bbpoints = boxes[q]
+                crowd_id = crowd_ids[q]
+
+                writedata['annotations'].append({
+                        'id': annotation_id,
+                        'image_id': j,
+                        'category_id': category_id,
+                        'segmentation': mask,
+                        'area': bb_area,
+                        'bbox': bbpoints,
+                        'iscrowd': crowd_id
                     })
-
-        # Procedure to store the annotations in the final JSON file
-        category_ids, masks, crowd_ids, status = process_json(os.path.join(imgdir, jn), classes)
-        areas, boxes = bounding_box(masks)
-
-        for q in range(len(category_ids)):
-            category_id = category_ids[q]
-            mask = masks[q]
-            bb_area = areas[q]
-            bbpoints = boxes[q]
-            crowd_id = crowd_ids[q]
-
-            writedata['annotations'].append({
-                    'id': annotation_id,
-                    'image_id': j,
-                    'category_id': category_id,
-                    'segmentation': mask,
-                    'area': bb_area,
-                    'bbox': bbpoints,
-                    'iscrowd': crowd_id
-                })
-    
-            annotation_id = annotation_id+1
+        
+                annotation_id = annotation_id+1
             
     with open(os.path.join(rootdir, output_file), 'w') as outfile:
         json.dump(writedata, outfile)
@@ -379,6 +467,7 @@ def check_json_presence(imgdir, dataset, name):
         ## remove the annotation-folder again
         annot_folder_present = os.path.isdir(annot_folder)
         if annot_folder_present:
+            time.sleep(1)
             shutil.rmtree(annot_folder)
 
 
