@@ -12,10 +12,10 @@ See [INSTALL.md](../INSTALL.md)
 <br/> <br/>
 
 ## Annotation procedure
-Because active learning involves an iterative annotation of the most-informative images, we assume that the training, validation and test images have their corresponding json annotations from the **labelme** program. Please find the installation instructions of labelme on: https://github.com/wkentaro/labelme.
+Because active learning involves an iterative annotation of the most-informative images, we assume that the training, validation and test images have their corresponding json/xml annotations from the either the **labelme** software, **v7-darwin** software or **cvat** software. Our default annotation procedure is based on the **labelme** software. Please find the installation instructions of labelme on: https://github.com/wkentaro/labelme.
 <br/>
 
-**It is not required to annotate every single image, because the active learning algorithm will select the most-informative images for you to annotate.** <br/>
+**It is not required to annotate all images yet, because the active learning algorithm will select the most-informative images for you to annotate.** <br/>
 
 *Annotation procedure (labelme):*
 1. Annotate each individual object by either a polygon, a circle or a rectangle. For our use-case, the polygon was the default shape.
@@ -29,10 +29,10 @@ Because active learning involves an iterative annotation of the most-informative
 Place all images and annotations in one folder. Remember that it is not required to annotate every single image in the folder, because we only want to annotate the most-informative images. <br/> 
 
 1. The active-learning algorithm random samples a big train-set (the size of the train-set is specified by a ratio). 
-2. From the big train-set, a smaller initial train-set is randomly sampled (its size can be specified). The images that do not have an annotation are placed in the **annotate subfolder** inside your image folder. You first need to annotate these images with labelme. 
+2. From the big train-set, a smaller initial train-set is randomly sampled (its size can be specified). The images that do not have an annotation are placed in the **annotate** subfolder inside your image folder. You first need to annotate these images with labelme (json), v7-darwin (json) or cvat (xml). 
 3. The same procedure is repeated for the validation and test-set (the size of these sets are specified with another ratio). 
 4. After the first training iteration, the sampling algorithm will infer the algorithm on the remaining images of the big train-set, to select the ones that are most-informative. The size of this  **image pool** can be specified as well.
-5. The images in the pool that lack an annotation, are placed in the **annotate subfolder**, so that they can be annotated with labelme. 
+5. The images in the pool that lack an annotation, are placed in the **annotate** subfolder, so that they can be annotated with labelme (json), v7-darwin (json) or cvat (xml). 
 6. Step 4-5 are repeated for several training iterations. The number of iterations can be specified. 
 
 <br/>**Please note that this method does not work with the default COCO json-files of detectron2. These json-files summarize all annotations that have been completed before the training starts. Because active learning involves an iterative train and annotation procedure, these COCO-jsons lack the desired format.** 
@@ -46,4 +46,4 @@ See [maskAL.py](maskAL.py)
 Our software was forked from detectron2 (https://github.com/facebookresearch/detectron2). As such, the software will be released under the [Apache 2.0 license](LICENSE). <br/><br/>
 
 ## Acknowledgements
-Two of the software methods were inspired by the work of RovelMan (https://github.com/RovelMan/active-learning-framework). maskAL was developed by Pieter Blok (pieter.blok@wur.nl).<br/><br/>
+maskAL was developed by Pieter Blok (pieter.blok@wur.nl).<br/><br/>
