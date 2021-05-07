@@ -1,17 +1,23 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 15:06:20
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-03-25 15:40:13
+# @Last Modified time: 2021-05-07 13:40:48
 
 import numpy as np
 import torch
 
-def uncertainty(observations, iterations, width, height, device):
+def uncertainty(observations, iterations, max_entropy, width, height, device):
     uncertainty_list = []
     
     for key, val in observations.items():
         softmaxes = [v['softmaxes'] for v in val]
         entropies = torch.stack([torch.distributions.Categorical(softmax).entropy() for softmax in softmaxes])
+        
+        ## first normalize the entropy-value with the maximum entropy (which is the least confident situation with equal softmaxes for all classes)
+        entropies_norm = torch.stack([torch.divide(entropy, max_entropy.to(device)) for entropy in entropies])
+
+        ## invert the normalized entropy-values so it can be properly used in the uncertainty calculation
+        inv_entropies_norm = torch.stack([torch.subtract(torch.ones(1).to(device), entropy_norm) for entropy_norm in entropies_norm])
 
         mean_bbox = torch.mean(torch.stack([v['pred_boxes'].tensor for v in val]), axis=0)
         mean_mask = torch.mean(torch.stack([v['pred_masks'].flatten().type(torch.cuda.FloatTensor) for v in val]), axis=0)
@@ -48,8 +54,7 @@ def uncertainty(observations, iterations, width, height, device):
         val_len = torch.tensor(len(val)).to(device)
         outputs_len = torch.tensor(iterations).to(device)
 
-        # u_sem = torch.clamp(1-torch.max(entropies), min=0, max=1)
-        u_sem = torch.clamp(1-torch.mean(entropies), min=0, max=1)
+        u_sem = torch.clamp(torch.mean(inv_entropies_norm), min=0, max=1)
         u_spl_m = torch.clamp(torch.divide(mask_IOUs.sum(), val_len), min=0, max=1)
         u_spl_b = torch.clamp(torch.divide(bbox_IOUs.sum(), val_len), min=0, max=1)
         
