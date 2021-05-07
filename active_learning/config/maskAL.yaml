@@ -1,0 +1,22 @@
+# Parameters for maskAL
+# python maskAL.py --cfg active_learning/cfg/maskAL_broccoli.yaml
+# explanation can be found here: https://git.wur.nl/blok012/maskAL
+
+# folders
+weightsroot: "./weights"
+resultsroot: "./results"
+dataroot: "/mnt/nvme2n1p2/PieterBlok/PhD/Paper 04 - Active Learning/Data"
+imgdir: "/mnt/nvme2n1p2/PieterBlok/PhD/Paper 04 - Active Learning/Data/field16_sexbierum"
+
+# training-parameters
+classes: ['broccoli', 'damaged', 'matured', 'cateye', 'headrot']
+train_val_test_split: [0.9, 0.05, 0.05]
+
+# active-learning sampling
+strategies: ['uncertainty', 'certainty', 'random']
+initial_datasize: 50
+pool_size: 25
+loops: 2
+iterations: 5
+batch_size: 5
+iou_thres: 0.5
