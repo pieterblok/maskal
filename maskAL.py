@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-05-07 17:14:50
+# @Last Modified time: 2021-05-10 16:22:04
 
 ## Active learning with Mask R-CNN
 
@@ -34,6 +34,8 @@ from detectron2.data.datasets import register_coco_instances
 from detectron2.engine import DefaultTrainer
 from detectron2.evaluation import COCOEvaluator, inference_on_dataset
 from detectron2.modeling import build_model
+from detectron2.engine.hooks import HookBase
+import detectron2.utils.comm as comm
 
 ## libraries that are specific for dropout training
 from active_learning.strategies.dropout import FastRCNNConvFCHeadDropout
@@ -109,13 +111,54 @@ def calculate_max_entropy(classes):
     
 
 def Train_Eval(dataroot, imgdir, classes, weightsfolder, resultsfolder, csv_name, init):
-    ## CustomTrainer with evaluator
+    ## Hook to automatically save the best checkpoint
+    class BestCheckpointer(HookBase):
+        def __init__(self, eval_period, metric):
+            self._period = eval_period
+            self.metric = metric
+            self.logger = setup_logger(name="d2.checkpointer.best")
+            
+        def store_best_model(self):
+            metric = self.trainer.storage._latest_scalars
+
+            try:
+                current_value = metric[self.metric][0]
+                try:
+                    highest_value = metric['highest_value'][0]
+                except:
+                    highest_value = 0
+
+                self.logger.info("current-value ({:s}): {:.2f}, highest-value ({:s}): {:.2f}".format(self.metric, current_value, self.metric, highest_value))
+
+                if current_value > highest_value:
+                    self.logger.info("saving best model...")
+                    self.trainer.checkpointer.save("best_model")
+                    self.trainer.storage.put_scalar('highest_value', current_value)
+                    comm.synchronize()
+            except:
+                pass
+
+        def after_step(self):
+            next_iter = self.trainer.iter + 1
+            is_final = next_iter == self.trainer.max_iter
+            if is_final or (self._period > 0 and next_iter % self._period == 0):
+                self.store_best_model()
+            self.trainer.storage.put_scalars(timetest=12)
+
+
+    ## CustomTrainer with evaluator and automatic checkpoint-saver
     class CustomTrainer(DefaultTrainer):
         @classmethod
         def build_evaluator(cls, cfg, dataset_name, output_folder=None):
             if output_folder is None:
                 output_folder = os.path.join(cfg.OUTPUT_DIR, "inference")
             return COCOEvaluator(dataset_name, ("bbox", "segm"), False, output_folder)
+
+        def build_hooks(self):
+            hooks = super().build_hooks()
+            hooks.insert(-1, BestCheckpointer(cfg.TEST.EVAL_PERIOD, 'segm/AP'))
+            return hooks
+
 
     if init:
         register_coco_instances("train", {}, os.path.join(dataroot, "train.json"), imgdir)
@@ -158,8 +201,8 @@ def Train_Eval(dataroot, imgdir, classes, weightsfolder, resultsfolder, csv_name
     cfg.SOLVER.WARMUP_ITERS = 1000
     cfg.SOLVER.MAX_ITER = 5000
     cfg.SOLVER.STEPS = (1000, 3000, 4000)
-    cfg.SOLVER.CHECKPOINT_PERIOD = 5001
-    cfg.TEST.EVAL_PERIOD = 1000
+    cfg.SOLVER.CHECKPOINT_PERIOD = (cfg.SOLVER.MAX_ITER+1)
+    cfg.TEST.EVAL_PERIOD = 500
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = len(classes)
     cfg.OUTPUT_DIR = weightsfolder
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
@@ -169,7 +212,12 @@ def Train_Eval(dataroot, imgdir, classes, weightsfolder, resultsfolder, csv_name
 
     ## evaluation
     trainer.resume_or_load(resume=True)
-    cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")
+
+    try:
+        cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "best_model.pth")
+    except:
+        cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")
+        
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5   # set the testing threshold for this model
     cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.01
     cfg.DATASETS.TEST = ("test",)
@@ -179,7 +227,12 @@ def Train_Eval(dataroot, imgdir, classes, weightsfolder, resultsfolder, csv_name
     eval_results = inference_on_dataset(trainer.model, val_loader, evaluator)
     
     segm_strings = [c.replace(c, 'AP-' + c) for c in classes]
-    segm_values = [round(eval_results['segm'][s], 1) for s in segm_strings]
+
+    if len(classes) == 1:
+        segm_values = [round(eval_results['segm']['AP'], 1) for s in segm_strings]
+    else:
+        segm_values = [round(eval_results['segm'][s], 1) for s in segm_strings]
+
     write_values = [len(dataset_dicts_train), round(eval_results['segm']['AP'], 1)] + segm_values
 
     with open(os.path.join(resultsfolder, csv_name), 'a', newline='') as csvfile:
