@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-05-10 16:22:04
+# @Last Modified time: 2021-05-11 16:24:51
 
 ## Active learning with Mask R-CNN
 
@@ -40,6 +40,7 @@ import detectron2.utils.comm as comm
 ## libraries that are specific for dropout training
 from active_learning.strategies.dropout import FastRCNNConvFCHeadDropout
 from active_learning.strategies.dropout import FastRCNNOutputLayersDropout
+from active_learning.strategies.dropout import MaskRCNNConvUpsampleHeadDropout
 from active_learning.sampling import prepare_initial_dataset, update_train_dataset
 from active_learning.sampling.montecarlo_dropout import MonteCarloDropout
 from active_learning.sampling import observations
@@ -184,6 +185,7 @@ def Train_Eval(dataroot, imgdir, classes, weightsfolder, resultsfolder, csv_name
     cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml"))
     cfg.MODEL.ROI_BOX_HEAD.NAME = 'FastRCNNConvFCHeadDropout'
     cfg.MODEL.ROI_HEADS.NAME = 'StandardROIHeadsDropout'
+    cfg.MODEL.ROI_MASK_HEAD.NAME = 'MaskRCNNConvUpsampleHeadDropout'
     cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml")
     cfg.MODEL.ROI_HEADS.SOFTMAXES = False
 
