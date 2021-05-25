@@ -33,7 +33,10 @@ def uncertainty(observations, iterations, max_entropy, width, height, device):
                 IOU = torch.divide(overlap.sum(), union.sum())
                 mask_IOUs.append(IOU.unsqueeze(0))
 
-        mask_IOUs = torch.cat(mask_IOUs)
+        if len(mask_IOUs) > 0:
+            mask_IOUs = torch.cat(mask_IOUs)
+        else:
+            mask_IOUs = torch.tensor([float('NaN')]).to(device)
 
         bbox_IOUs = []
         mean_bbox = mean_bbox.squeeze(0)
@@ -49,7 +52,10 @@ def uncertainty(observations, iterations, max_entropy, width, height, device):
             bbox_IOU = torch.divide(interArea, (boxAArea + boxBArea - interArea))
             bbox_IOUs.append(bbox_IOU.unsqueeze(0))
 
-        bbox_IOUs = torch.cat(bbox_IOUs)
+        if len(bbox_IOUs) > 0:
+            bbox_IOUs = torch.cat(bbox_IOUs)
+        else:
+            bbox_IOUs = torch.tensor([float('NaN')]).to(device)
 
         val_len = torch.tensor(len(val)).to(device)
         outputs_len = torch.tensor(iterations).to(device)

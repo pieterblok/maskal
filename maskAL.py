@@ -191,6 +191,8 @@ def Train_Eval(dataroot, imgdir, classes, weightsfolder, resultsfolder, csv_name
 
 
     ## initialize the training parameters  
+    cfg.DATALOADER.SAMPLER_TRAIN = "RepeatFactorTrainingSampler"
+    cfg.DATALOADER.REPEAT_THRESHOLD = 0.001
     cfg.DATASETS.TRAIN = ("train",)
     cfg.DATASETS.TEST = ("val",)
     cfg.NUM_GPUS = 1
