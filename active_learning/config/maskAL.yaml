@@ -15,8 +15,8 @@ classes: ['broccoli', 'damaged', 'matured', 'cateye', 'headrot']
 
 # active-learning sampling
 strategies: ['uncertainty', 'random', 'certainty']
-initial_datasize: 50
-pool_size: 25
+initial_datasize: 100
+pool_size: 50
 loops: 18
 iterations: 5
 batch_size: 5
