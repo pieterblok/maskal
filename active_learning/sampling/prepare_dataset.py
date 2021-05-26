@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-05-26 13:06:31
+# @Last Modified time: 2021-05-26 16:27:26
 
 import random
 import os
@@ -18,14 +18,33 @@ import xmltodict
 supported_cv2_formats = (".bmp", ".dib", ".jpeg", ".jpg", ".jpe", ".jp2", ".png", ".pbm", ".pgm", ".ppm", ".sr", ".ras", ".tiff", ".tif")
 
 
-def list_files(annotdir):
+def list_files(rootdir):
     images = []
     annotations = []
+
+    if os.path.isdir(rootdir):
+        for root, dirs, files in list(os.walk(rootdir)):
+            for name in files:
+                subdir = root.split(rootdir)
+                all('' == s for s in subdir)
+                
+                if subdir[1].startswith('/'):
+                    subdirname = subdir[1][1:]
+                else:
+                    subdirname = subdir[1]
+
+                if name.lower().endswith(supported_cv2_formats):
+                    if all('' == s for s in subdir):
+                        images.append(name)
+                    else:
+                        images.append(os.path.join(subdirname, name))
+
+                if name.endswith(".json") or name.endswith(".xml"):
+                    if all('' == s for s in subdir):
+                        annotations.append(name)
+                    else:
+                        annotations.append(os.path.join(subdirname, name))
     
-    if os.path.isdir(annotdir):
-        all_files = os.listdir(annotdir)
-        images = [x for x in all_files if x.lower().endswith(supported_cv2_formats)]
-        annotations = [x for x in all_files if ".json" in x or ".xml" in x]
         images.sort()
         annotations.sort()
 
@@ -589,6 +608,10 @@ def check_json_presence(imgdir, dataset, name):
         for p in range(len(diff_img_annot)):
             search_idx = img_basenames.index(diff_img_annot[p])
             image_copy = dataset[search_idx]
+
+            if not os.path.isdir(os.path.dirname(os.path.join(annot_folder, image_copy))):
+                os.makedirs(os.path.dirname(os.path.join(annot_folder, image_copy)))
+
             shutil.copyfile(os.path.join(imgdir, image_copy), os.path.join(annot_folder, image_copy))
 
     ## check whether all images have been annotated in the "annotate" subdirectory
