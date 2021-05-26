@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-04-26 17:06:02
+# @Last Modified time: 2021-05-26 13:06:31
 
 import random
 import os
@@ -400,7 +400,7 @@ def write_file(imgdir, images, name):
             f.write("{:s}\n".format(img))
 
 
-def split_datasets(rootdir, images, train_val_test_split, initial_datasize):
+def split_datasets_randomly(rootdir, images, train_val_test_split, initial_datasize):
     all_ids = np.arange(len(images))
     random.shuffle(all_ids)
 
@@ -629,19 +629,40 @@ def check_json_presence(imgdir, dataset, name):
             shutil.rmtree(annot_folder)
 
 
-def prepare_initial_dataset(rootdir, imgdir, classes, train_val_test_split, initial_datasize):
+def prepare_initial_dataset_randomly(rootdir, imgdir, classes, train_val_test_split, initial_datasize):
     rename_xml_files(imgdir)
     images, annotations = list_files(imgdir)
     print("{:d} images found!".format(len(images)))
     print("{:d} annotations found!".format(len(annotations)))
 
-    datasets, names = split_datasets(rootdir, images, train_val_test_split, initial_datasize)
+    datasets, names = split_datasets_randomly(rootdir, images, train_val_test_split, initial_datasize)
     for dataset, name in zip(datasets, names):
         check_json_presence(imgdir, dataset, name)
 
     print("Converting annotations...")
     for dataset, name in zip(datasets, names):
         create_json(rootdir, imgdir, dataset, classes, name)   
+
+
+def prepare_initial_dataset(rootdir, classes, traindir, valdir, testdir, initial_datasize):
+    for imgdir, name, init_ds in zip([traindir, valdir, testdir], ['train', 'val', 'test'], [initial_datasize, 0, 0]):
+        print("")
+        print("Processing {:s}-dataset: {:s}".format(name, imgdir))
+        rename_xml_files(imgdir)
+        images, annotations = list_files(imgdir)
+        print("{:d} images found!".format(len(images)))
+        print("{:d} annotations found!".format(len(annotations)))
+
+        if init_ds > 0:
+            initial_train_images = random.sample(images, initial_datasize)
+            write_file(rootdir, images, "train")
+            write_file(rootdir, initial_train_images, "initial_train")
+            check_json_presence(imgdir, initial_train_images, "train")
+            create_json(rootdir, imgdir, initial_train_images, classes, "train")
+        else:
+            write_file(rootdir, images, name)
+            check_json_presence(imgdir, images, name)
+            create_json(rootdir, imgdir, images, classes, name)
 
 
 def update_train_dataset(rootdir, imgdir, classes, train_list):

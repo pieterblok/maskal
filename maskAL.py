@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-05-26 09:23:12
+# @Last Modified time: 2021-05-26 11:52:19
 
 ## Active learning with Mask R-CNN
 
@@ -111,7 +111,7 @@ def calculate_max_entropy(classes):
     return max_entropy
     
 
-def Train_Eval(dataroot, imgdir, classes, weightsfolder, resultsfolder, csv_name, init):
+def Train_Eval(dataroot, traindir, valdir, testdir, classes, weightsfolder, resultsfolder, csv_name, init):
     ## Hook to automatically save the best checkpoint
     class BestCheckpointer(HookBase):
         def __init__(self, eval_period, metric):
@@ -162,9 +162,9 @@ def Train_Eval(dataroot, imgdir, classes, weightsfolder, resultsfolder, csv_name
 
 
     if init:
-        register_coco_instances("train", {}, os.path.join(dataroot, "train.json"), imgdir)
-        register_coco_instances("val", {}, os.path.join(dataroot, "val.json"), imgdir)
-        register_coco_instances("test", {}, os.path.join(dataroot, "test.json"), imgdir)
+        register_coco_instances("train", {}, os.path.join(dataroot, "train.json"), traindir)
+        register_coco_instances("val", {}, os.path.join(dataroot, "val.json"), valdir)
+        register_coco_instances("test", {}, os.path.join(dataroot, "test.json"), testdir)
 
         train_metadata = MetadataCatalog.get("train")
         val_metadata = MetadataCatalog.get("val")
@@ -175,7 +175,7 @@ def Train_Eval(dataroot, imgdir, classes, weightsfolder, resultsfolder, csv_name
         dataset_dicts_test = DatasetCatalog.get("test")
     else:
         DatasetCatalog.remove("train")
-        register_coco_instances("train", {}, os.path.join(dataroot, "train.json"), imgdir)
+        register_coco_instances("train", {}, os.path.join(dataroot, "train.json"), traindir)
         train_metadata = MetadataCatalog.get("train")
         dataset_dicts_train = DatasetCatalog.get("train")
 
@@ -272,18 +272,18 @@ if __name__ == "__main__":
         csv_name = csv_names[strat]
 
         if not os.path.exists(os.path.join(config['dataroot'], "initial_train.txt")):
-            prepare_initial_dataset(config['dataroot'], config['imgdir'], config['classes'], config['train_val_test_split'], config['initial_datasize'])
+            prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
         else:
             initial_train_file = open(os.path.join(config['dataroot'], "initial_train.txt"), "r")
             initial_train_names = initial_train_file.readlines()
             initial_train_names = [initial_train_names[i].rstrip('\n') for i in range(len(initial_train_names))]
-            update_train_dataset(config['dataroot'], config['imgdir'], config['classes'], initial_train_names)
+            update_train_dataset(config['dataroot'], config['traindir'], config['classes'], initial_train_names)
 
         ## perform the training on the initial dataset
         if strat == 0:
-            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['imgdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=True)
+            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=True)
         else:
-            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['imgdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=False)
+            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=False)
 
         ## sampling of images
         for l in range(config['loops']):    
@@ -306,7 +306,7 @@ if __name__ == "__main__":
                     ## find the images from the pool_list the algorithm is most uncertain about
                     for d in tqdm(range(len(pool_list))):
                         filename = pool_list[d]
-                        img = cv2.imread(os.path.join(config['imgdir'], filename))
+                        img = cv2.imread(os.path.join(config['traindir'], filename))
                         width, height = img.shape[:-1]
                         outputs = predictor(img)
 
@@ -329,8 +329,8 @@ if __name__ == "__main__":
 
                     ## update the training list and retrain the algorithm
                     train_list = train_names + list(pool.keys())
-                    update_train_dataset(config['dataroot'], config['imgdir'], config['classes'], train_list)
-                    cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['imgdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=False)
+                    update_train_dataset(config['dataroot'], config['traindir'], config['classes'], train_list)
+                    cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=False)
                 else:
                     print("All images are used for the training, stopping the program...")
 
@@ -343,7 +343,7 @@ if __name__ == "__main__":
                     ## find the images from the pool_list the algorithm is most uncertain about
                     for d in tqdm(range(len(pool_list))):
                         filename = pool_list[d]
-                        img = cv2.imread(os.path.join(config['imgdir'], filename))
+                        img = cv2.imread(os.path.join(config['traindir'], filename))
                         width, height = img.shape[:-1]
                         outputs = predictor(img)
 
@@ -366,8 +366,8 @@ if __name__ == "__main__":
 
                     ## update the training list and retrain the algorithm
                     train_list = train_names + list(pool.keys())
-                    update_train_dataset(config['dataroot'], config['imgdir'], config['classes'], train_list)
-                    cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['imgdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=False)
+                    update_train_dataset(config['dataroot'], config['traindir'], config['classes'], train_list)
+                    cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=False)
                 else:
                     print("All images are used for the training, stopping the program...")
 
@@ -375,8 +375,8 @@ if __name__ == "__main__":
                 if len(pool_list) > 0:
                     sample_list = random.choices(pool_list, k=config['pool_size'])
                     train_list = train_names + sample_list
-                    update_train_dataset(config['dataroot'], config['imgdir'], config['classes'], train_list)
-                    cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['imgdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=False)
+                    update_train_dataset(config['dataroot'], config['traindir'], config['classes'], train_list)
+                    cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=False)
                 else:
                     print("All images are used for the training, stopping the program...")
 

@@ -6,16 +6,17 @@
 weightsroot: "./weights"
 resultsroot: "./results"
 dataroot: "./datasets"
-imgdir: "./datasets/training_20210504"
+traindir: "./datasets/train"
+valdir: "./datasets/val"
+testdir: "./datasets/test"
 
 # training-parameters
 classes: ['broccoli', 'damaged', 'matured', 'cateye', 'headrot']
-train_val_test_split: [0.9, 0.05, 0.05]
 
 # active-learning sampling
-strategies: ['uncertainty', 'certainty', 'random']
-initial_datasize: 100
-pool_size: 50
+strategies: ['uncertainty', 'random', 'certainty']
+initial_datasize: 50
+pool_size: 25
 loops: 18
 iterations: 5
 batch_size: 5
