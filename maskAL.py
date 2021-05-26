@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-05-26 16:25:12
+# @Last Modified time: 2021-05-26 20:51:10
 
 ## Active learning with Mask R-CNN
 
@@ -289,7 +289,13 @@ if __name__ == "__main__":
         for l in range(config['loops']):    
             pool = {}
 
-            train_names = [os.path.basename(dataset_dicts_train[i]['file_name']) for i in range(len(dataset_dicts_train))]
+            train_names = []
+            for i in range(len(dataset_dicts_train)):
+                imgname = dataset_dicts_train[i]['file_name'].split(config['traindir'])
+                if imgname[1].startswith('/'):
+                    train_names.append(imgname[1][1:])
+                else:
+                    train_names.append(imgname[1])
             write_train_files(train_names, resultsfolder, l)
             
             train_file = open(os.path.join(config['dataroot'], "train.txt"), "r")
