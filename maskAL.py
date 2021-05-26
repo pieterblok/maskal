@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-05-11 16:24:51
+# @Last Modified time: 2021-05-26 09:23:12
 
 ## Active learning with Mask R-CNN
 
@@ -313,13 +313,14 @@ if __name__ == "__main__":
                         obs = observations(outputs, config['iou_thres'])
                         img_uncertainty = uncertainty(obs, config['iterations'], max_entropy, width, height, device) ## reduce the iterations when facing a "CUDA out of memory" error
 
-                        if len(pool) < config['pool_size']:
-                            pool[filename] = float(img_uncertainty)
-                        else:
-                            max_id, max_val = max(pool.items(), key=operator.itemgetter(1))
-                            if float(img_uncertainty) < max_val:
-                                del pool[max_id]
+                        if not np.isnan(img_uncertainty):
+                            if len(pool) < config['pool_size']:
                                 pool[filename] = float(img_uncertainty)
+                            else:
+                                max_id, max_val = max(pool.items(), key=operator.itemgetter(1))
+                                if float(img_uncertainty) < max_val:
+                                    del pool[max_id]
+                                    pool[filename] = float(img_uncertainty)
 
                     sorted_pool = sorted(pool.items(), key=operator.itemgetter(1))
                     pool = {}
@@ -349,13 +350,14 @@ if __name__ == "__main__":
                         obs = observations(outputs, config['iou_thres'])
                         img_uncertainty = uncertainty(obs, config['iterations'], max_entropy, width, height, device) ## reduce the iterations when facing a "CUDA out of memory" error
 
-                        if len(pool) < config['pool_size']:
-                            pool[filename] = float(img_uncertainty)
-                        else:
-                            min_id, min_val = min(pool.items(), key=operator.itemgetter(1))
-                            if float(img_uncertainty) > min_val:
-                                del pool[min_id]
+                        if not np.isnan(img_uncertainty):
+                            if len(pool) < config['pool_size']:
                                 pool[filename] = float(img_uncertainty)
+                            else:
+                                min_id, min_val = min(pool.items(), key=operator.itemgetter(1))
+                                if float(img_uncertainty) > min_val:
+                                    del pool[min_id]
+                                    pool[filename] = float(img_uncertainty)
 
                     sorted_pool = sorted(pool.items(), key=operator.itemgetter(1))
                     pool = {}
