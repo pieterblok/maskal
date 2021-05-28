@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-05-26 20:51:10
+# @Last Modified time: 2021-05-28 13:32:56
 
 ## Active learning with Mask R-CNN
 
@@ -64,11 +64,6 @@ def check_direxcist(dir):
             os.makedirs(dir)  # make new folder
 
 
-def remove_initial_training_set(dataroot):
-    if os.path.exists(os.path.join(dataroot, "initial_train.txt")):
-        os.remove(os.path.join(dataroot, "initial_train.txt"))
-
-
 def init_folders_and_files(weightsroot, resultsroot, classes, strategies):
     weightsfolders = []
     resultsfolders = []
@@ -96,12 +91,9 @@ def init_folders_and_files(weightsroot, resultsroot, classes, strategies):
     return weightsfolders, resultsfolders, csv_names
 
 
-def write_train_files(train_names, writefolder, iteration):
-    write_txt_name = "trainfiles_iteration{:03d}.txt".format(iteration+1)
-    with open(os.path.join(writefolder, write_txt_name), 'w') as filehandle:
-        for train_name in train_names:
-            filehandle.write("{:s}\n".format(train_name))
-    filehandle.close()
+def remove_initial_training_set(dataroot):
+    if os.path.exists(os.path.join(dataroot, "initial_train.txt")):
+        os.remove(os.path.join(dataroot, "initial_train.txt"))
 
 
 def calculate_max_entropy(classes):
@@ -109,6 +101,25 @@ def calculate_max_entropy(classes):
     probs = torch.from_numpy(least_confident)
     max_entropy = torch.distributions.Categorical(probs).entropy()
     return max_entropy
+
+
+def get_train_names(dataset_dicts_train, traindir):
+    train_names = []
+    for i in range(len(dataset_dicts_train)):
+        imgname = dataset_dicts_train[i]['file_name'].split(traindir)
+        if imgname[1].startswith('/'):
+            train_names.append(imgname[1][1:])
+        else:
+            train_names.append(imgname[1])
+    return train_names
+
+
+def write_train_files(train_names, writefolder, iteration):
+    write_txt_name = "trainfiles_iteration{:03d}.txt".format(iteration)
+    with open(os.path.join(writefolder, write_txt_name), 'w') as filehandle:
+        for train_name in train_names:
+            filehandle.write("{:s}\n".format(train_name))
+    filehandle.close()
     
 
 def Train_Eval(dataroot, traindir, valdir, testdir, classes, weightsfolder, resultsfolder, csv_name, init):
@@ -285,18 +296,12 @@ if __name__ == "__main__":
         else:
             cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=False)
 
+        train_names = get_train_names(dataset_dicts_train, config['traindir'])
+        write_train_files(train_names, resultsfolder, 0)
+
         ## sampling of images
         for l in range(config['loops']):    
             pool = {}
-
-            train_names = []
-            for i in range(len(dataset_dicts_train)):
-                imgname = dataset_dicts_train[i]['file_name'].split(config['traindir'])
-                if imgname[1].startswith('/'):
-                    train_names.append(imgname[1][1:])
-                else:
-                    train_names.append(imgname[1])
-            write_train_files(train_names, resultsfolder, l)
             
             train_file = open(os.path.join(config['dataroot'], "train.txt"), "r")
             all_train_names = train_file.readlines()
@@ -337,6 +342,10 @@ if __name__ == "__main__":
                     train_list = train_names + list(pool.keys())
                     update_train_dataset(config['dataroot'], config['traindir'], config['classes'], train_list)
                     cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=False)
+
+                    ## write the pooled image-names to a txt-file
+                    train_names = get_train_names(dataset_dicts_train, config['traindir'])
+                    write_train_files(train_names, resultsfolder, l+1)
                 else:
                     print("All images are used for the training, stopping the program...")
 
@@ -374,6 +383,10 @@ if __name__ == "__main__":
                     train_list = train_names + list(pool.keys())
                     update_train_dataset(config['dataroot'], config['traindir'], config['classes'], train_list)
                     cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=False)
+
+                    ## write the pooled image-names to a txt-file
+                    train_names = get_train_names(dataset_dicts_train, config['traindir'])
+                    write_train_files(train_names, resultsfolder, l+1)
                 else:
                     print("All images are used for the training, stopping the program...")
 
@@ -383,6 +396,8 @@ if __name__ == "__main__":
                     train_list = train_names + sample_list
                     update_train_dataset(config['dataroot'], config['traindir'], config['classes'], train_list)
                     cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=False)
+                    train_names = get_train_names(dataset_dicts_train, config['traindir'])
+                    write_train_files(train_names, resultsfolder, l+1)
                 else:
                     print("All images are used for the training, stopping the program...")
 
