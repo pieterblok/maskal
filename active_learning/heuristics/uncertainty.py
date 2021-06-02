@@ -1,12 +1,12 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 15:06:20
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-05-07 13:40:48
+# @Last Modified time: 2021-06-02 15:41:37
 
 import numpy as np
 import torch
 
-def uncertainty(observations, iterations, max_entropy, width, height, device):
+def uncertainty(observations, iterations, max_entropy, width, height, device, mode = 'min'):
     uncertainty_list = []
     
     for key, val in observations.items():
@@ -60,7 +60,15 @@ def uncertainty(observations, iterations, max_entropy, width, height, device):
         val_len = torch.tensor(len(val)).to(device)
         outputs_len = torch.tensor(iterations).to(device)
 
-        u_sem = torch.clamp(torch.mean(inv_entropies_norm), min=0, max=1)
+        if mode == 'min':
+            u_sem = torch.clamp(torch.min(inv_entropies_norm), min=0, max=1)
+        elif mode == 'mean':
+            u_sem = torch.clamp(torch.mean(inv_entropies_norm), min=0, max=1)
+        elif mode == 'max':
+            u_sem = torch.clamp(torch.max(inv_entropies_norm), min=0, max=1)
+        else:
+            u_sem = torch.clamp(torch.mean(inv_entropies_norm), min=0, max=1)
+
         u_spl_m = torch.clamp(torch.divide(mask_IOUs.sum(), val_len), min=0, max=1)
         u_spl_b = torch.clamp(torch.divide(bbox_IOUs.sum(), val_len), min=0, max=1)
         
@@ -78,8 +86,16 @@ def uncertainty(observations, iterations, max_entropy, width, height, device):
 
     if uncertainty_list:
         uncertainty_list = torch.cat(uncertainty_list)
-        uncertainty = torch.mean(uncertainty_list)
-        # uncertainty = torch.min(uncertainty_list)
+
+        if mode == 'min':
+            uncertainty = torch.min(uncertainty_list)
+        elif mode == 'mean':
+            uncertainty = torch.mean(uncertainty_list)
+        elif mode == 'max':
+            uncertainty = torch.max(uncertainty_list)
+        else:
+            uncertainty = torch.mean(uncertainty_list)
+            
     else:
         uncertainty = torch.tensor([float('NaN')]).to(device)
 

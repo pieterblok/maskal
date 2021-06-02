@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-02 15:14:24
+# @Last Modified time: 2021-06-02 16:07:01
 
 ## Active learning with Mask R-CNN
 
@@ -322,7 +322,7 @@ if __name__ == "__main__":
                         outputs = predictor(img)
 
                         obs = observations(outputs, config['iou_thres'])
-                        img_uncertainty = uncertainty(obs, config['iterations'], max_entropy, width, height, device) ## reduce the iterations when facing a "CUDA out of memory" error
+                        img_uncertainty = uncertainty(obs, config['iterations'], max_entropy, width, height, device, mode = 'min') ## reduce the iterations when facing a "CUDA out of memory" error
 
                         if not np.isnan(img_uncertainty):
                             if len(pool) < config['pool_size']:
@@ -363,7 +363,7 @@ if __name__ == "__main__":
                         outputs = predictor(img)
 
                         obs = observations(outputs, config['iou_thres'])
-                        img_uncertainty = uncertainty(obs, config['iterations'], max_entropy, width, height, device) ## reduce the iterations when facing a "CUDA out of memory" error
+                        img_uncertainty = uncertainty(obs, config['iterations'], max_entropy, width, height, device, mode = 'max') ## reduce the iterations when facing a "CUDA out of memory" error
 
                         if not np.isnan(img_uncertainty):
                             if len(pool) < config['pool_size']:
