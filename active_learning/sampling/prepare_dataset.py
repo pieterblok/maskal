@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-05-26 16:27:26
+# @Last Modified time: 2021-06-02 15:15:00
 
 import random
 import os
@@ -49,6 +49,54 @@ def list_files(rootdir):
         annotations.sort()
 
     return images, annotations
+
+
+def matching_images_and_annotations(rootdir):
+    images = []
+    images_basenames = []
+    annotations = []
+    annotations_basenames = []
+
+    matching_images = []
+    matching_annotations = []
+
+    if os.path.isdir(rootdir):
+        for root, dirs, files in list(os.walk(rootdir)):
+            for name in files:
+                subdir = root.split(rootdir)
+                all('' == s for s in subdir)
+                
+                if subdir[1].startswith('/'):
+                    subdirname = subdir[1][1:]
+                else:
+                    subdirname = subdir[1]
+
+                if name.lower().endswith(supported_cv2_formats):
+                    if all('' == s for s in subdir):
+                        images.append(name)
+                        images_basenames.append(os.path.splitext(name)[0])
+                    else:
+                        images.append(os.path.join(subdirname, name))
+                        images_basenames.append(os.path.splitext(os.path.join(subdirname, name))[0])
+
+                if name.endswith(".json") or name.endswith(".xml"):
+                    if all('' == s for s in subdir):
+                        annotations.append(name)
+                        annotations_basenames.append(os.path.splitext(name)[0])
+                    else:
+                        annotations.append(os.path.join(subdirname, name))
+                        annotations_basenames.append(os.path.splitext(os.path.join(subdirname, name))[0])
+    
+        images.sort()
+        images_basenames.sort()
+        annotations.sort()
+        annotations_basenames.sort()
+
+        matching_images_annotations = list(set(images_basenames) & set(annotations_basenames))
+        matching_images = [img for img in images if os.path.splitext(img)[0] in matching_images_annotations]
+        matching_annotations = [annot for annot in annotations if os.path.splitext(annot)[0] in matching_images_annotations]
+
+    return matching_images, matching_annotations
 
 
 def rename_xml_files(annotdir):
@@ -686,6 +734,20 @@ def prepare_initial_dataset(rootdir, classes, traindir, valdir, testdir, initial
             write_file(rootdir, images, name)
             check_json_presence(imgdir, images, name)
             create_json(rootdir, imgdir, images, classes, name)
+
+
+def prepare_complete_dataset(rootdir, classes, traindir, valdir, testdir):
+    for imgdir, name in zip([traindir, valdir, testdir], ['train', 'val', 'test']):
+        print("")
+        print("Processing {:s}-dataset: {:s}".format(name, imgdir))
+        rename_xml_files(imgdir)
+        images, annotations = matching_images_and_annotations(imgdir)
+        print("{:d} matching images found!".format(len(images)))
+        print("{:d} matching annotations found!".format(len(annotations)))
+
+        write_file(rootdir, images, name)
+        check_json_presence(imgdir, images, name)
+        create_json(rootdir, imgdir, images, classes, name)            
 
 
 def update_train_dataset(rootdir, imgdir, classes, train_list):

@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-05-28 13:32:56
+# @Last Modified time: 2021-06-02 15:14:24
 
 ## Active learning with Mask R-CNN
 
@@ -41,7 +41,7 @@ import detectron2.utils.comm as comm
 from active_learning.strategies.dropout import FastRCNNConvFCHeadDropout
 from active_learning.strategies.dropout import FastRCNNOutputLayersDropout
 from active_learning.strategies.dropout import MaskRCNNConvUpsampleHeadDropout
-from active_learning.sampling import prepare_initial_dataset, update_train_dataset
+from active_learning.sampling import prepare_initial_dataset, update_train_dataset, prepare_complete_dataset
 from active_learning.sampling.montecarlo_dropout import MonteCarloDropout
 from active_learning.sampling import observations
 from active_learning.heuristics import uncertainty
@@ -400,5 +400,15 @@ if __name__ == "__main__":
                     write_train_files(train_names, resultsfolder, l+1)
                 else:
                     print("All images are used for the training, stopping the program...")
+
+
+    if config['train_complete_trainset']:
+        weightsfolder, resultsfolder, csv_name = init_folders_and_files(config['weightsroot'], config['resultsroot'], config['classes'], ['complete_trainset'])
+        prepare_complete_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'])
+        if len(config['strategies']) == 0:
+            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=True)
+        else:
+            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=False)
+        
 
     print("Finished...")

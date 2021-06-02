@@ -12,6 +12,7 @@ testdir: "./datasets/test"
 
 # training-parameters
 classes: ['broccoli', 'damaged', 'matured', 'cateye', 'headrot']
+train_complete_trainset: False
 
 # active-learning sampling
 strategies: ['uncertainty', 'random', 'certainty']
