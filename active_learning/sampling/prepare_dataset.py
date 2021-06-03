@@ -1,8 +1,9 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-02 15:15:00
+# @Last Modified time: 2021-06-03 11:26:17
 
+import sys
 import random
 import os
 import numpy as np
@@ -14,6 +15,18 @@ import datetime
 import time
 from tqdm import tqdm
 import xmltodict
+import logging
+
+
+## initialize the logging
+log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s \n'
+logger = logging.getLogger(__name__)
+logger.setLevel('DEBUG')
+file_handler = logging.StreamHandler()
+formatter = logging.Formatter(log_format)
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
 
 supported_cv2_formats = (".bmp", ".dib", ".jpeg", ".jpg", ".jpe", ".jp2", ".png", ".pbm", ".pgm", ".ppm", ".sr", ".ras", ".tiff", ".tif")
 
@@ -716,46 +729,58 @@ def prepare_initial_dataset_randomly(rootdir, imgdir, classes, train_val_test_sp
 
 
 def prepare_initial_dataset(rootdir, classes, traindir, valdir, testdir, initial_datasize):
-    for imgdir, name, init_ds in zip([traindir, valdir, testdir], ['train', 'val', 'test'], [initial_datasize, 0, 0]):
-        print("")
-        print("Processing {:s}-dataset: {:s}".format(name, imgdir))
+    try:
+        for imgdir, name, init_ds in zip([traindir, valdir, testdir], ['train', 'val', 'test'], [initial_datasize, 0, 0]):
+            print("")
+            print("Processing {:s}-dataset: {:s}".format(name, imgdir))
+            rename_xml_files(imgdir)
+            images, annotations = list_files(imgdir)
+            print("{:d} images found!".format(len(images)))
+            print("{:d} annotations found!".format(len(annotations)))
+
+            if init_ds > 0:
+                initial_train_images = random.sample(images, initial_datasize)
+                write_file(rootdir, images, "train")
+                write_file(rootdir, initial_train_images, "initial_train")
+                check_json_presence(imgdir, initial_train_images, "train")
+                create_json(rootdir, imgdir, initial_train_images, classes, "train")
+            else:
+                write_file(rootdir, images, name)
+                check_json_presence(imgdir, images, name)
+                create_json(rootdir, imgdir, images, classes, name)
+    except:
+        logger.error("Cannot create initial-datasets")
+        sys.exit("Closing application")
+
+
+def prepare_complete_dataset(rootdir, classes, traindir, valdir, testdir):
+    try:
+        for imgdir, name in zip([traindir, valdir, testdir], ['train', 'val', 'test']):
+            print("")
+            print("Processing {:s}-dataset: {:s}".format(name, imgdir))
+            rename_xml_files(imgdir)
+            images, annotations = matching_images_and_annotations(imgdir)
+            print("{:d} matching images found!".format(len(images)))
+            print("{:d} matching annotations found!".format(len(annotations)))
+
+            write_file(rootdir, images, name)
+            check_json_presence(imgdir, images, name)
+            create_json(rootdir, imgdir, images, classes, name)
+    except:
+        logger.error("Cannot create complete-dataset")
+        sys.exit("Closing application")            
+
+
+def update_train_dataset(rootdir, imgdir, classes, train_list):
+    try:
         rename_xml_files(imgdir)
         images, annotations = list_files(imgdir)
         print("{:d} images found!".format(len(images)))
         print("{:d} annotations found!".format(len(annotations)))
 
-        if init_ds > 0:
-            initial_train_images = random.sample(images, initial_datasize)
-            write_file(rootdir, images, "train")
-            write_file(rootdir, initial_train_images, "initial_train")
-            check_json_presence(imgdir, initial_train_images, "train")
-            create_json(rootdir, imgdir, initial_train_images, classes, "train")
-        else:
-            write_file(rootdir, images, name)
-            check_json_presence(imgdir, images, name)
-            create_json(rootdir, imgdir, images, classes, name)
-
-
-def prepare_complete_dataset(rootdir, classes, traindir, valdir, testdir):
-    for imgdir, name in zip([traindir, valdir, testdir], ['train', 'val', 'test']):
-        print("")
-        print("Processing {:s}-dataset: {:s}".format(name, imgdir))
-        rename_xml_files(imgdir)
-        images, annotations = matching_images_and_annotations(imgdir)
-        print("{:d} matching images found!".format(len(images)))
-        print("{:d} matching annotations found!".format(len(annotations)))
-
-        write_file(rootdir, images, name)
-        check_json_presence(imgdir, images, name)
-        create_json(rootdir, imgdir, images, classes, name)            
-
-
-def update_train_dataset(rootdir, imgdir, classes, train_list):
-    rename_xml_files(imgdir)
-    images, annotations = list_files(imgdir)
-    print("{:d} images found!".format(len(images)))
-    print("{:d} annotations found!".format(len(annotations)))
-
-    check_json_presence(imgdir, train_list, "train")
-    print("Converting annotations...")
-    create_json(rootdir, imgdir, train_list, classes, "train")
+        check_json_presence(imgdir, train_list, "train")
+        print("Converting annotations...")
+        create_json(rootdir, imgdir, train_list, classes, "train")
+    except:
+        logger.error("Cannot update train-dataset")
+        sys.exit("Closing application")
