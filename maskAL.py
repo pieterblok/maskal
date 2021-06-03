@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-03 13:18:08
+# @Last Modified time: 2021-06-03 16:27:05
 
 ## Active learning with Mask R-CNN
 
@@ -96,20 +96,17 @@ def init_folders_and_files(weightsroot, resultsroot, classes, strategies, number
                 csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
                 csvwriter.writerow(write_strings)
     else:
-        weightsfolder = os.path.join(weightsroot, strategies)
-        check_direxcist(weightsfolder)
-        weightsfolders.append(weightsfolder)
+        weightsfolders = os.path.join(weightsroot, strategies)
+        check_direxcist(weightsfolders)
         
-        resultsfolder = os.path.join(resultsroot, strategies)
-        check_direxcist(resultsfolder)
-        resultsfolders.append(resultsfolder)
+        resultsfolders = os.path.join(resultsroot, strategies)
+        check_direxcist(resultsfolders)
 
         segm_strings = [c.replace(c, 'mAP-' + c) for c in classes]
         write_strings = ['train_size', 'mAP'] + segm_strings
-        csv_name = strategies + '.csv'
-        csv_names.append(csv_name)
+        csv_names = strategies + '.csv'
 
-        with open(os.path.join(resultsfolder, csv_name), 'w', newline='') as csvfile:
+        with open(os.path.join(resultsfolders, csv_names), 'w', newline='') as csvfile:
             csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
             csvwriter.writerow(write_strings)
 
@@ -453,12 +450,12 @@ if __name__ == "__main__":
 
     ## train the complete train-pool to determine the base-line performance
     if config['train_complete_trainset']:
-        weightsfolder, resultsfolder, csv_name = init_folders_and_files(config['weightsroot'], config['resultsroot'], config['classes'], ['complete_trainset'])
+        weightsfolder, resultsfolder, csv_name = init_folders_and_files(config['weightsroot'], config['resultsroot'], config['classes'], 'complete_trainset')
         prepare_complete_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'])
         if len(config['strategies']) == 0:
-            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name[0], gpu_num, init=True)
+            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, init=True)
         else:
-            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name[0], gpu_num, init=False)
+            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, init=False)
         
 
     logger.info("Active learning is finished!")
