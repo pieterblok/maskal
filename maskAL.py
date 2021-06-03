@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-02 16:07:01
+# @Last Modified time: 2021-06-03 13:18:08
 
 ## Active learning with Mask R-CNN
 
@@ -16,6 +16,7 @@ import cv2
 import csv
 import random
 import operator
+import logging
 from collections import OrderedDict
 from tqdm import tqdm
 import warnings
@@ -53,9 +54,15 @@ def imshow(img):
     plt.imshow(img[:, :, [2, 1, 0]])
     plt.axis("off")
     plt.show()
-       
-## run on gpu 0
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+
+
+## initialize the logging
+log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s \n'
+logger = logging.getLogger(__name__)
+logger.setLevel('DEBUG')
+file_handler = logging.StreamHandler()
+formatter = logging.Formatter(log_format)
+file_handler.setFormatter(formatter)
 
 
 def check_direxcist(dir):
@@ -64,24 +71,42 @@ def check_direxcist(dir):
             os.makedirs(dir)  # make new folder
 
 
-def init_folders_and_files(weightsroot, resultsroot, classes, strategies):
+def init_folders_and_files(weightsroot, resultsroot, classes, strategies, number=0):
     weightsfolders = []
     resultsfolders = []
     csv_names = []
 
-    for strat in range(len(strategies)):
-        strategy = strategies[strat]
-        weightsfolder = os.path.join(weightsroot, strategy)
+    if number > 0:
+        for strat in range(len(strategies)):
+            strategy = strategies[strat]
+            weightsfolder = os.path.join(weightsroot, str(number), strategy)
+            check_direxcist(weightsfolder)
+            weightsfolders.append(weightsfolder)
+            
+            resultsfolder = os.path.join(resultsroot, str(number), strategy)
+            check_direxcist(resultsfolder)
+            resultsfolders.append(resultsfolder)
+
+            segm_strings = [c.replace(c, 'mAP-' + c) for c in classes]
+            write_strings = ['train_size', 'mAP'] + segm_strings
+            csv_name = strategy + '.csv'
+            csv_names.append(csv_name)
+
+            with open(os.path.join(resultsfolder, csv_name), 'w', newline='') as csvfile:
+                csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
+                csvwriter.writerow(write_strings)
+    else:
+        weightsfolder = os.path.join(weightsroot, strategies)
         check_direxcist(weightsfolder)
         weightsfolders.append(weightsfolder)
         
-        resultsfolder = os.path.join(resultsroot, strategy)
+        resultsfolder = os.path.join(resultsroot, strategies)
         check_direxcist(resultsfolder)
         resultsfolders.append(resultsfolder)
 
         segm_strings = [c.replace(c, 'mAP-' + c) for c in classes]
         write_strings = ['train_size', 'mAP'] + segm_strings
-        csv_name = strategy + '.csv'
+        csv_name = strategies + '.csv'
         csv_names.append(csv_name)
 
         with open(os.path.join(resultsfolder, csv_name), 'w', newline='') as csvfile:
@@ -114,6 +139,21 @@ def get_train_names(dataset_dicts_train, traindir):
     return train_names
 
 
+def get_initial_train_names(config):
+    initial_train_file = open(os.path.join(config['dataroot'], "initial_train.txt"), "r")
+    initial_train_names = initial_train_file.readlines()
+    initial_train_names = [initial_train_names[idx].rstrip('\n') for idx in range(len(initial_train_names))]
+    return initial_train_names
+
+
+def create_pool_list(config, train_names):
+    train_file = open(os.path.join(config['dataroot'], "train.txt"), "r")
+    all_train_names = train_file.readlines()
+    all_train_names = [all_train_names[idx].rstrip('\n') for idx in range(len(all_train_names))]
+    pool_list = list(set(all_train_names) - set(train_names))
+    return pool_list
+
+
 def write_train_files(train_names, writefolder, iteration):
     write_txt_name = "trainfiles_iteration{:03d}.txt".format(iteration)
     with open(os.path.join(writefolder, write_txt_name), 'w') as filehandle:
@@ -122,7 +162,7 @@ def write_train_files(train_names, writefolder, iteration):
     filehandle.close()
     
 
-def Train_Eval(dataroot, traindir, valdir, testdir, classes, weightsfolder, resultsfolder, csv_name, init):
+def Train_Eval(dataroot, traindir, valdir, testdir, classes, weightsfolder, resultsfolder, csv_name, gpu_num, init):
     ## Hook to automatically save the best checkpoint
     class BestCheckpointer(HookBase):
         def __init__(self, eval_period, metric):
@@ -206,7 +246,7 @@ def Train_Eval(dataroot, traindir, valdir, testdir, classes, weightsfolder, resu
     cfg.DATALOADER.REPEAT_THRESHOLD = 0.001
     cfg.DATASETS.TRAIN = ("train",)
     cfg.DATASETS.TEST = ("val",)
-    cfg.NUM_GPUS = 1
+    cfg.NUM_GPUS = gpu_num
     cfg.DATALOADER.NUM_WORKERS = 2
     cfg.SOLVER.IMS_PER_BATCH = 2
     cfg.SOLVER.WEIGHT_DECAY = 0.0001
@@ -257,7 +297,93 @@ def Train_Eval(dataroot, traindir, valdir, testdir, classes, weightsfolder, resu
     return cfg, dataset_dicts_train
 
 
+def uncertainty_pooling(pool_list, cfg, config, max_entropy, mode):
+    pool = {}
+    cfg.MODEL.ROI_HEADS.SOFTMAXES = True
+    predictor = MonteCarloDropout(cfg, config['iterations'], config['batch_size'])
+    device = cfg.MODEL.DEVICE
+
+    if len(pool_list) > 0:
+        ## find the images from the pool_list the algorithm is most uncertain about
+        for d in tqdm(range(len(pool_list))):
+            filename = pool_list[d]
+            img = cv2.imread(os.path.join(config['traindir'], filename))
+            width, height = img.shape[:-1]
+            outputs = predictor(img)
+
+            obs = observations(outputs, config['iou_thres'])
+            img_uncertainty = uncertainty(obs, config['iterations'], max_entropy, width, height, device, mode) ## reduce the iterations when facing a "CUDA out of memory" error
+
+            if not np.isnan(img_uncertainty):
+                if len(pool) < config['pool_size']:
+                    pool[filename] = float(img_uncertainty)
+                else:
+                    max_id, max_val = max(pool.items(), key=operator.itemgetter(1))
+                    if float(img_uncertainty) < max_val:
+                        del pool[max_id]
+                        pool[filename] = float(img_uncertainty)
+
+        sorted_pool = sorted(pool.items(), key=operator.itemgetter(1))
+        pool = {}
+        for k, v in sorted_pool:
+            pool[k] = v
+    else:
+        print("All images are used for the training, stopping the program...")
+
+    return pool
+
+
+def certainty_pooling(pool_list, cfg, config, max_entropy, mode):
+    pool = {}
+    cfg.MODEL.ROI_HEADS.SOFTMAXES = True
+    predictor = MonteCarloDropout(cfg, config['iterations'], config['batch_size'])
+    device = cfg.MODEL.DEVICE
+
+    if len(pool_list) > 0:
+        ## find the images from the pool_list the algorithm is most uncertain about
+        for d in tqdm(range(len(pool_list))):
+            filename = pool_list[d]
+            img = cv2.imread(os.path.join(config['traindir'], filename))
+            width, height = img.shape[:-1]
+            outputs = predictor(img)
+
+            obs = observations(outputs, config['iou_thres'])
+            img_uncertainty = uncertainty(obs, config['iterations'], max_entropy, width, height, device, mode) ## reduce the iterations when facing a "CUDA out of memory" error
+
+            if not np.isnan(img_uncertainty):
+                if len(pool) < config['pool_size']:
+                    pool[filename] = float(img_uncertainty)
+                else:
+                    min_id, min_val = min(pool.items(), key=operator.itemgetter(1))
+                    if float(img_uncertainty) > min_val:
+                        del pool[min_id]
+                        pool[filename] = float(img_uncertainty)
+
+        sorted_pool = sorted(pool.items(), key=operator.itemgetter(1))
+        pool = {}
+        for k, v in sorted_pool:
+            pool[k] = v
+    else:
+        print("All images are used for the training, stopping the program...")
+
+    return pool
+
+
+def random_pooling(pool_list, cfg, config, max_entropy, mode):
+    pool = {}
+    if len(pool_list) > 0:
+        sample_list = random.sample(pool_list, k=config['pool_size'])
+        pool = {k:0.0 for k in sample_list}
+    else:
+        print("All images are used for the training, stopping the program...")
+
+    return pool    
+
+
 if __name__ == "__main__":
+    logger.addHandler(file_handler)
+    logger.info("Starting main-application")
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, default='./active_learning/config/maskAL.yaml', help='yaml with the training parameters')
     args = parser.parse_args()
@@ -266,149 +392,73 @@ if __name__ == "__main__":
         with open(args.config, 'rb') as file:
             config = yaml.load(file, Loader=yaml.FullLoader)
     except FileNotFoundError:
-        sys.exit(f"Could not find configuration-file {args.config}, closing application")
+        logger.error(f"Could not find configuration-file: {args.config}")
+        sys.exit("Closing application")
 
     print("Configuration:")
     for key, value in config.items():
         print(key, ':', value)
 
-    weightsfolders, resultsfolders, csv_names = init_folders_and_files(config['weightsroot'], config['resultsroot'], config['classes'], config['strategies'])
-    remove_initial_training_set(config['dataroot'])
-    max_entropy = calculate_max_entropy(config['classes'])
+    os.environ["CUDA_VISIBLE_DEVICES"] = config['cuda_visible_devices']
+    gpu_num = len(config['cuda_visible_devices'])
 
-    for strat in range(len(config['strategies'])):
-        strategy = config['strategies'][strat]
-        weightsfolder = weightsfolders[strat]
-        resultsfolder = resultsfolders[strat]
-        csv_name = csv_names[strat]
 
-        if not os.path.exists(os.path.join(config['dataroot'], "initial_train.txt")):
-            prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
-        else:
-            initial_train_file = open(os.path.join(config['dataroot'], "initial_train.txt"), "r")
-            initial_train_names = initial_train_file.readlines()
-            initial_train_names = [initial_train_names[i].rstrip('\n') for i in range(len(initial_train_names))]
-            update_train_dataset(config['dataroot'], config['traindir'], config['classes'], initial_train_names)
+    for n in range(config['no_experiments']):
+        weightsfolders, resultsfolders, csv_names = init_folders_and_files(config['weightsroot'], config['resultsroot'], config['classes'], config['strategies'], n+1)
+        remove_initial_training_set(config['dataroot'])
+        max_entropy = calculate_max_entropy(config['classes'])
 
-        ## perform the training on the initial dataset
-        if strat == 0:
-            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=True)
-        else:
-            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=False)
+        for i, (strategy, mode) in enumerate(zip(config['strategies'], config['mode'])):
+            weightsfolder = weightsfolders[i]
+            resultsfolder = resultsfolders[i]
+            csv_name = csv_names[i]
 
-        train_names = get_train_names(dataset_dicts_train, config['traindir'])
-        write_train_files(train_names, resultsfolder, 0)
+            if not os.path.exists(os.path.join(config['dataroot'], "initial_train.txt")):
+                prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
+            else:
+                initial_train_names = get_initial_train_names(config)
+                update_train_dataset(config['dataroot'], config['traindir'], config['classes'], initial_train_names)
 
-        ## sampling of images
-        for l in range(config['loops']):    
-            pool = {}
-            
-            train_file = open(os.path.join(config['dataroot'], "train.txt"), "r")
-            all_train_names = train_file.readlines()
-            all_train_names = [all_train_names[i].rstrip('\n') for i in range(len(all_train_names))]
-            pool_list = list(set(all_train_names) - set(train_names))
 
-            if strategy == 'uncertainty':
-                cfg.MODEL.ROI_HEADS.SOFTMAXES = True
-                predictor = MonteCarloDropout(cfg, config['iterations'], config['batch_size'])
-                device = cfg.MODEL.DEVICE
+            ## perform the training on the initial dataset
+            if i == 0:
+                cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, init=True)
+            else:
+                cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, init=False)
 
-                if len(pool_list) > 0:
-                    ## find the images from the pool_list the algorithm is most uncertain about
-                    for d in tqdm(range(len(pool_list))):
-                        filename = pool_list[d]
-                        img = cv2.imread(os.path.join(config['traindir'], filename))
-                        width, height = img.shape[:-1]
-                        outputs = predictor(img)
+            train_names = get_train_names(dataset_dicts_train, config['traindir'])
+            write_train_files(train_names, resultsfolder, 0)
 
-                        obs = observations(outputs, config['iou_thres'])
-                        img_uncertainty = uncertainty(obs, config['iterations'], max_entropy, width, height, device, mode = 'min') ## reduce the iterations when facing a "CUDA out of memory" error
 
-                        if not np.isnan(img_uncertainty):
-                            if len(pool) < config['pool_size']:
-                                pool[filename] = float(img_uncertainty)
-                            else:
-                                max_id, max_val = max(pool.items(), key=operator.itemgetter(1))
-                                if float(img_uncertainty) < max_val:
-                                    del pool[max_id]
-                                    pool[filename] = float(img_uncertainty)
+            ## sampling of images
+            for l in range(config['loops']):    
+                pool_list = create_pool_list(config, train_names)
 
-                    sorted_pool = sorted(pool.items(), key=operator.itemgetter(1))
-                    pool = {}
-                    for k, v in sorted_pool:
-                        pool[k] = v    
+                if strategy + '_pooling' in dir():
+                    ## do the pooling
+                    pool = eval(strategy + '_pooling(pool_list, cfg, config, max_entropy, mode)') #eval runs a function as string-input
 
                     ## update the training list and retrain the algorithm
                     train_list = train_names + list(pool.keys())
                     update_train_dataset(config['dataroot'], config['traindir'], config['classes'], train_list)
-                    cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=False)
+                    cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, init=False)
 
                     ## write the pooled image-names to a txt-file
                     train_names = get_train_names(dataset_dicts_train, config['traindir'])
                     write_train_files(train_names, resultsfolder, l+1)
                 else:
-                    print("All images are used for the training, stopping the program...")
-
-            if strategy == 'certainty':
-                cfg.MODEL.ROI_HEADS.SOFTMAXES = True
-                predictor = MonteCarloDropout(cfg, config['iterations'], config['batch_size'])
-                device = cfg.MODEL.DEVICE
-
-                if len(pool_list) > 0:
-                    ## find the images from the pool_list the algorithm is most uncertain about
-                    for d in tqdm(range(len(pool_list))):
-                        filename = pool_list[d]
-                        img = cv2.imread(os.path.join(config['traindir'], filename))
-                        width, height = img.shape[:-1]
-                        outputs = predictor(img)
-
-                        obs = observations(outputs, config['iou_thres'])
-                        img_uncertainty = uncertainty(obs, config['iterations'], max_entropy, width, height, device, mode = 'max') ## reduce the iterations when facing a "CUDA out of memory" error
-
-                        if not np.isnan(img_uncertainty):
-                            if len(pool) < config['pool_size']:
-                                pool[filename] = float(img_uncertainty)
-                            else:
-                                min_id, min_val = min(pool.items(), key=operator.itemgetter(1))
-                                if float(img_uncertainty) > min_val:
-                                    del pool[min_id]
-                                    pool[filename] = float(img_uncertainty)
-
-                    sorted_pool = sorted(pool.items(), key=operator.itemgetter(1))
-                    pool = {}
-                    for k, v in sorted_pool:
-                        pool[k] = v    
-
-                    ## update the training list and retrain the algorithm
-                    train_list = train_names + list(pool.keys())
-                    update_train_dataset(config['dataroot'], config['traindir'], config['classes'], train_list)
-                    cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=False)
-
-                    ## write the pooled image-names to a txt-file
-                    train_names = get_train_names(dataset_dicts_train, config['traindir'])
-                    write_train_files(train_names, resultsfolder, l+1)
-                else:
-                    print("All images are used for the training, stopping the program...")
-
-            if strategy == 'random':
-                if len(pool_list) > 0:
-                    sample_list = random.choices(pool_list, k=config['pool_size'])
-                    train_list = train_names + sample_list
-                    update_train_dataset(config['dataroot'], config['traindir'], config['classes'], train_list)
-                    cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, init=False)
-                    train_names = get_train_names(dataset_dicts_train, config['traindir'])
-                    write_train_files(train_names, resultsfolder, l+1)
-                else:
-                    print("All images are used for the training, stopping the program...")
+                    logger.error(f"The {strategy}-strategy is not defined")
+                    sys.exit("Closing application")
 
 
+    ## train the complete train-pool to determine the base-line performance
     if config['train_complete_trainset']:
         weightsfolder, resultsfolder, csv_name = init_folders_and_files(config['weightsroot'], config['resultsroot'], config['classes'], ['complete_trainset'])
         prepare_complete_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'])
         if len(config['strategies']) == 0:
-            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name, init=True)
+            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name[0], gpu_num, init=True)
         else:
-            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name, init=False)
+            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name[0], gpu_num, init=False)
         
 
-    print("Finished...")
+    logger.info("Active learning is finished!")

@@ -11,14 +11,17 @@ valdir: "./datasets/val"
 testdir: "./datasets/test"
 
 # training-parameters
+cuda_visible_devices: '0'
 classes: ['broccoli', 'damaged', 'matured', 'cateye', 'headrot']
 train_complete_trainset: False
 
 # active-learning sampling
+no_experiments: 1
 strategies: ['uncertainty', 'random', 'certainty']
-initial_datasize: 100
-pool_size: 50
-loops: 18
+mode: ['min', ' ', 'max']
+initial_datasize: 200
+pool_size: 100
+loops: 8
 iterations: 5
 batch_size: 5
 iou_thres: 0.5
