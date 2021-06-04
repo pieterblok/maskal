@@ -1,0 +1,24 @@
+# Parameters for t-SNE visualization
+# cd maskAL
+# python active_learning/utils/tsne.py --config active_learning/utils/tsne.yaml
+# explanation can be found here: https://git.wur.nl/blok012/maskAL
+
+# folders and files
+weightsfolder: "./weights/uncertainty"
+weightsfile: "best_model.pth"
+resultsfolder: "./results/broccoli"
+dataroot: "./datasets"
+traindir: "./datasets/train"
+valdir: "./datasets/val"
+testdir: "./datasets/test"
+
+# inference-parameters
+cuda_visible_devices: '0'
+score_thres: 0.25
+nms_thres: 0.01
+visualize: False
+
+# tsne-parameters
+num_images: 100
+classes: ['broccoli', 'damaged', 'matured', 'cateye', 'headrot']
+colors: [[0, 255, 0], [255, 0, 0], [255, 0, 255], [0, 0, 255], [0, 255, 255]]
