@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-04 13:44:37
+# @Last Modified time: 2021-06-04 13:49:37
 
 ## t-SNE visualization of the box-features of Mask R-CNN
 ## t-SNE is a technique for dimensionality reduction for the visualization of high-dimensional datasets
@@ -336,7 +336,7 @@ if __name__ == "__main__":
             imshow(vis.get_image()[:, :, ::-1])
 
         iou_matrix, classes, classes_annot, scores = obtain_iou_matrix(d, instances)
-        image_paths, labels, features_tsne = get_tsne_features(d, classes, classes_annot, scores, iou_matrix, train_metadata, image_paths, labels, features_tsne, mode='det')
+        image_paths, labels, features_tsne = get_tsne_features(d, classes, classes_annot, scores, iou_matrix, train_metadata, image_paths, labels, features_tsne, mode=config['mode'])
 
     ## do the t-SNE visualization
     tsne = TSNE(n_components=2).fit_transform(features_tsne)

@@ -19,6 +19,7 @@ nms_thres: 0.01
 visualize: False
 
 # tsne-parameters
-num_images: 100
+num_images: 14000
 classes: ['broccoli', 'damaged', 'matured', 'cateye', 'headrot']
 colors: [[0, 255, 0], [255, 0, 0], [255, 0, 255], [0, 0, 255], [0, 255, 255]]
+mode: 'det'
