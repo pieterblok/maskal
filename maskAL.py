@@ -418,7 +418,7 @@ if __name__ == "__main__":
 
 
             ## perform the training on the initial dataset
-            if i == 0:
+            if n == 0 and i == 0:
                 cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, init=True)
             else:
                 cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, init=False)
