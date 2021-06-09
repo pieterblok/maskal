@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-03 16:27:05
+# @Last Modified time: 2021-06-09 13:55:40
 
 ## Active learning with Mask R-CNN
 
@@ -125,6 +125,21 @@ def calculate_max_entropy(classes):
     return max_entropy
 
 
+def get_normalized_weights(dataset_dicts_train, num_classes):
+    class_count = np.zeros(num_classes).astype(np.int64)
+
+    for d in dataset_dicts_train:
+        for k in range(len(d["annotations"])):
+            category_id = d["annotations"][k]['category_id']
+            class_count[category_id] += 1
+
+    class_count = class_count.astype(np.float64)
+    class_count[class_count == 0] = np.nan
+    weights = 1 / class_count
+    weights = weights / np.nansum(weights)
+    return list(weights)
+
+
 def get_train_names(dataset_dicts_train, traindir):
     train_names = []
     for i in range(len(dataset_dicts_train)):
@@ -239,8 +254,6 @@ def Train_Eval(dataroot, traindir, valdir, testdir, classes, weightsfolder, resu
 
 
     ## initialize the training parameters  
-    cfg.DATALOADER.SAMPLER_TRAIN = "RepeatFactorTrainingSampler"
-    cfg.DATALOADER.REPEAT_THRESHOLD = 0.001
     cfg.DATASETS.TRAIN = ("train",)
     cfg.DATASETS.TEST = ("val",)
     cfg.NUM_GPUS = gpu_num
@@ -256,6 +269,15 @@ def Train_Eval(dataroot, traindir, valdir, testdir, classes, weightsfolder, resu
     cfg.SOLVER.CHECKPOINT_PERIOD = (cfg.SOLVER.MAX_ITER+1)
     cfg.TEST.EVAL_PERIOD = 500
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = len(classes)
+
+    ## the following function and settings aim to reduce the effects of the imbalanced dataset
+    normalized_weights = get_normalized_weights(dataset_dicts_train, len(classes))
+    cfg.DATALOADER.SAMPLER_TRAIN = "RepeatFactorTrainingSampler"
+    cfg.DATALOADER.REPEAT_THRESHOLD = 0.001
+    cfg.MODEL.ROI_BOX_HEAD.NORMALIZED_WEIGHTS = normalized_weights
+    cfg.MODEL.ROI_BOX_HEAD.FOREGROUND_FRACTION = 0.1
+
+    ## start the training
     cfg.OUTPUT_DIR = weightsfolder
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
     trainer = CustomTrainer(cfg)
