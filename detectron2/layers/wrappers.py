@@ -23,26 +23,14 @@ def cat(tensors: List[torch.Tensor], dim: int = 0):
     return torch.cat(tensors, dim)
 
 
-def cross_entropy(input, target, normalized_weights, foreground_fraction, device='cuda', *, reduction="mean", **kwargs):
+def cross_entropy(input, target, *, reduction="mean", **kwargs):
     """
     Same as `torch.nn.functional.cross_entropy`, but returns 0 (instead of nan)
     for empty inputs.
     """
     if target.numel() == 0 and reduction == "mean":
         return input.sum() * 0.0  # connect the gradient
-
-    if len(normalized_weights) > 0:
-        weights = torch.FloatTensor(normalized_weights).to(device)
-        weights = weights * foreground_fraction
-        background_fraction = torch.tensor([float(1 - foreground_fraction)]).to(device)
-        weights = torch.cat((weights, background_fraction))
-        fg_sum = torch.nansum(weights[:-1])
-        bg_sum = torch.nansum(weights[-1])
-        weight_sum = fg_sum + bg_sum
-        class_loss = F.cross_entropy(input, target, weight=weights, **kwargs)
-    else:
-        class_loss = F.cross_entropy(input, target, **kwargs)
-    return class_loss
+    return F.cross_entropy(input, target, **kwargs)
 
 
 class _NewEmptyTensorOp(torch.autograd.Function):

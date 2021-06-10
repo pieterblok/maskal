@@ -283,10 +283,6 @@ _C.MODEL.ROI_BOX_HEAD = CN()
 # C4 don't use head name option
 # Options for non-C4 models: FastRCNNConvFCHead,
 _C.MODEL.ROI_BOX_HEAD.NAME = ""
-# Use normalized weights for the cross_entropy calculation when dealing with highly imbalanced datasets
-_C.MODEL.ROI_BOX_HEAD.NORMALIZED_WEIGHTS = []
-# Weight-fraction for the foreground-classes: typically this would be 0.1 for foreground and 0.9 for background 
-_C.MODEL.ROI_BOX_HEAD.FOREGROUND_FRACTION = 0.1
 # Options are: "smooth_l1", "giou"
 _C.MODEL.ROI_BOX_HEAD.BBOX_REG_LOSS_TYPE = "smooth_l1"
 # The final scaling coefficient on the box regression loss, used to balance the magnitude of its

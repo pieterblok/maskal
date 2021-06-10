@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-22 09:43:07
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-09 13:31:36
+# @Last Modified time: 2021-05-11 11:31:21
 
 #!/usr/bin/env python
 
@@ -142,12 +142,9 @@ class FastRCNNOutputLayersDropout(nn.Module):
         test_topk_per_image: int = 100,
         cls_agnostic_bbox_reg: bool = False,
         smooth_l1_beta: float = 0.0,
-        normalized_weights: list = [],
-        foreground_fraction: float = 0.1,
         box_reg_loss_type: str = "smooth_l1",
         loss_weight: Union[float, Dict[str, float]] = 1.0,
         softmaxes: bool = False,
-        device: str = "cuda",
     ):
         """
         NOTE: this interface is experimental.
@@ -191,14 +188,11 @@ class FastRCNNOutputLayersDropout(nn.Module):
         self.test_score_thresh = test_score_thresh
         self.test_nms_thresh = test_nms_thresh
         self.test_topk_per_image = test_topk_per_image
-        self.normalized_weights = normalized_weights
-        self.foreground_fraction = foreground_fraction
         self.box_reg_loss_type = box_reg_loss_type
         if isinstance(loss_weight, float):
             loss_weight = {"loss_cls": loss_weight, "loss_box_reg": loss_weight}
         self.loss_weight = loss_weight
         self.softmaxes = softmaxes
-        self.device = device
 
 
     @classmethod
@@ -213,12 +207,9 @@ class FastRCNNOutputLayersDropout(nn.Module):
             "test_score_thresh"     : cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST,
             "test_nms_thresh"       : cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST,
             "test_topk_per_image"   : cfg.TEST.DETECTIONS_PER_IMAGE,
-            "normalized_weights"    : cfg.MODEL.ROI_BOX_HEAD.NORMALIZED_WEIGHTS,
-            "foreground_fraction"   : cfg.MODEL.ROI_BOX_HEAD.FOREGROUND_FRACTION,
             "box_reg_loss_type"     : cfg.MODEL.ROI_BOX_HEAD.BBOX_REG_LOSS_TYPE,
             "loss_weight"           : {"loss_box_reg": cfg.MODEL.ROI_BOX_HEAD.BBOX_REG_LOSS_WEIGHT},
             "softmaxes"             : cfg.MODEL.ROI_HEADS.SOFTMAXES,
-            "device"                : cfg.MODEL.DEVICE,
             # fmt: on
         }
 
@@ -278,7 +269,7 @@ class FastRCNNOutputLayersDropout(nn.Module):
             proposal_boxes = gt_boxes = torch.empty((0, 4), device=proposal_deltas.device)
 
         losses = {
-            "loss_cls": cross_entropy(scores, gt_classes, self.normalized_weights, self.foreground_fraction, self.device, reduction="mean"),
+            "loss_cls": cross_entropy(scores, gt_classes, reduction="mean"),
             "loss_box_reg": self.box_reg_loss(
                 proposal_boxes, gt_boxes, proposal_deltas, gt_classes
             ),
