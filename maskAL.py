@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-11 11:38:23
+# @Last Modified time: 2021-06-11 13:36:44
 
 ## Active learning with Mask R-CNN
 
@@ -17,6 +17,7 @@ import csv
 import random
 import operator
 import logging
+from shutil import copyfile
 from collections import OrderedDict
 from tqdm import tqdm
 import warnings
@@ -150,10 +151,11 @@ def write_train_files(train_names, writefolder, iteration):
     filehandle.close()
     
 
-def Train_Eval(dataroot, traindir, valdir, testdir, classes, weightsfolder, resultsfolder, csv_name, gpu_num, init):
+def Train_MaskRCNN(dataroot, traindir, valdir, classes, weightsfolder, gpu_num, iter, init):
     ## Hook to automatically save the best checkpoint
     class BestCheckpointer(HookBase):
-        def __init__(self, eval_period, metric):
+        def __init__(self, iter, eval_period, metric):
+            self.iter = iter
             self._period = eval_period
             self.metric = metric
             self.logger = setup_logger(name="d2.checkpointer.best")
@@ -172,7 +174,7 @@ def Train_Eval(dataroot, traindir, valdir, testdir, classes, weightsfolder, resu
 
                 if current_value > highest_value:
                     self.logger.info("saving best model...")
-                    self.trainer.checkpointer.save("best_model")
+                    self.trainer.checkpointer.save("best_model_{:s}".format(str(iter).zfill(3)))
                     self.trainer.storage.put_scalar('highest_value', current_value)
                     comm.synchronize()
             except:
@@ -196,22 +198,18 @@ def Train_Eval(dataroot, traindir, valdir, testdir, classes, weightsfolder, resu
 
         def build_hooks(self):
             hooks = super().build_hooks()
-            hooks.insert(-1, BestCheckpointer(cfg.TEST.EVAL_PERIOD, 'segm/AP'))
+            hooks.insert(-1, BestCheckpointer(iter, cfg.TEST.EVAL_PERIOD, 'segm/AP'))
             return hooks
 
 
     if init:
         register_coco_instances("train", {}, os.path.join(dataroot, "train.json"), traindir)
-        register_coco_instances("val", {}, os.path.join(dataroot, "val.json"), valdir)
-        register_coco_instances("test", {}, os.path.join(dataroot, "test.json"), testdir)
-
         train_metadata = MetadataCatalog.get("train")
-        val_metadata = MetadataCatalog.get("val")
-        test_metadata = MetadataCatalog.get("test")
-
         dataset_dicts_train = DatasetCatalog.get("train")
+
+        register_coco_instances("val", {}, os.path.join(dataroot, "val.json"), valdir)
+        val_metadata = MetadataCatalog.get("val")
         dataset_dicts_val = DatasetCatalog.get("val")
-        dataset_dicts_test = DatasetCatalog.get("test")
     else:
         DatasetCatalog.remove("train")
         register_coco_instances("train", {}, os.path.join(dataroot, "train.json"), traindir)
@@ -253,11 +251,20 @@ def Train_Eval(dataroot, traindir, valdir, testdir, classes, weightsfolder, resu
     trainer.resume_or_load(resume=False)
     trainer.train()
 
-    ## evaluation
+    return cfg, dataset_dicts_train, trainer
+
+
+def Eval_MaskRCNN(cfg, trainer, dataroot, testdir, classes, weightsfolder, resultsfolder, csv_name, gpu_num, iter, init):    
+    if init:
+        register_coco_instances("test", {}, os.path.join(dataroot, "test.json"), testdir)
+        test_metadata = MetadataCatalog.get("test")
+        dataset_dicts_test = DatasetCatalog.get("test")
+
+    cfg.OUTPUT_DIR = weightsfolder
     trainer.resume_or_load(resume=True)
 
     try:
-        cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "best_model.pth")
+        cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "best_model_{:s}.pth".format(str(iter).zfill(3)))
     except:
         cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")
         
@@ -282,7 +289,14 @@ def Train_Eval(dataroot, traindir, valdir, testdir, classes, weightsfolder, resu
         csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
         csvwriter.writerow(write_values)
 
-    return cfg, dataset_dicts_train
+    return cfg
+
+
+def copy_initial_weight_file(read_folder, write_folder, iter):
+    weight_file = "best_model_{:s}.pth".format(str(iter).zfill(3))
+    check_direxcist(write_folder)
+    if os.path.exists(os.path.join(read_folder, weight_file)):
+        copyfile(os.path.join(read_folder, weight_file), os.path.join(write_folder, weight_file))
 
 
 def uncertainty_pooling(pool_list, cfg, config, max_entropy, mode):
@@ -389,35 +403,30 @@ if __name__ == "__main__":
 
     os.environ["CUDA_VISIBLE_DEVICES"] = config['cuda_visible_devices']
     gpu_num = len(config['cuda_visible_devices'])
-
-    weightsfolders, resultsfolders, csv_names = init_folders_and_files(config['weightsroot'], config['resultsroot'], config['classes'], config['strategies'], config['experiment_name'])
-    remove_initial_training_set(config['dataroot'])
     max_entropy = calculate_max_entropy(config['classes'])
 
-    for i, (strategy, mode) in enumerate(zip(config['strategies'], config['mode'])):
-        weightsfolder = weightsfolders[i]
-        resultsfolder = resultsfolders[i]
-        csv_name = csv_names[i]
-
-        if not os.path.exists(os.path.join(config['dataroot'], "initial_train.txt")):
-            prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
+    ## train Mask R-CNN on the initial-dataset
+    weightsfolders, resultsfolders, csv_names = init_folders_and_files(config['weightsroot'], config['resultsroot'], config['classes'], config['strategies'], config['experiment_name'])
+    remove_initial_training_set(config['dataroot'])
+    prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
+    cfg, dataset_dicts_train, trainer = Train_MaskRCNN(config['dataroot'], config['traindir'], config['valdir'], config['classes'], weightsfolders[0], gpu_num, 0, init=True)
+    
+    ## do the evaluation with the same initial-weight-files
+    for e, (weightsfolder, resultsfolder, csv_name) in enumerate(zip(weightsfolders, resultsfolders, csv_names)):
+        if e == 0:
+            cfg_init = Eval_MaskRCNN(cfg, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, 0, init=True)
         else:
-            initial_train_names = get_initial_train_names(config)
-            update_train_dataset(config['dataroot'], config['traindir'], config['classes'], initial_train_names)
-
-
-        ## perform the training on the initial dataset
-        if i == 0:
-            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, init=True)
-        else:
-            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, init=False)
-
+            copy_initial_weight_file(weightsfolders[0], weightsfolder, 0)
+            cfg_init = Eval_MaskRCNN(cfg, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, 0, init=False)
+        
         train_names = get_train_names(dataset_dicts_train, config['traindir'])
         write_train_files(train_names, resultsfolder, 0)
 
-
-        ## sampling of images
-        for l in range(config['loops']):    
+    ## active-learning strategies
+    for i, (strategy, mode, weightsfolder, resultsfolder, csv_name) in enumerate(zip(config['strategies'], config['mode'], weightsfolders, resultsfolders, csv_names)):
+        cfg = cfg_init
+        
+        for l in range(config['loops']):
             pool_list = create_pool_list(config, train_names)
 
             if strategy + '_pooling' in dir():
@@ -427,9 +436,10 @@ if __name__ == "__main__":
                 ## update the training list and retrain the algorithm
                 train_list = train_names + list(pool.keys())
                 update_train_dataset(config['dataroot'], config['traindir'], config['classes'], train_list)
-                cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, init=False)
+                cfg, dataset_dicts_train, trainer = Train_MaskRCNN(config['dataroot'], config['traindir'], config['valdir'], config['classes'], weightsfolder, gpu_num, l+1, init=False)
 
-                ## write the pooled image-names to a txt-file
+                ## evaluate and write the pooled image-names to a txt-file
+                cfg = Eval_MaskRCNN(cfg, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, l+1, init=False)
                 train_names = get_train_names(dataset_dicts_train, config['traindir'])
                 write_train_files(train_names, resultsfolder, l+1)
             else:
@@ -441,10 +451,15 @@ if __name__ == "__main__":
     if config['train_complete_trainset']:
         weightsfolder, resultsfolder, csv_name = init_folders_and_files(config['weightsroot'], config['resultsroot'], config['classes'], ['complete_trainset'])
         prepare_complete_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'])
-        if len(config['strategies']) == 0:
-            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name[0], gpu_num, init=True)
-        else:
-            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name[0], gpu_num, init=False)
         
+        if len(config['strategies']) == 0:
+            cfg, dataset_dicts_train, trainer = Train_MaskRCNN(config['dataroot'], config['traindir'], config['valdir'], config['classes'], weightsfolder[0], gpu_num, 0, init=True)
+            cfg = Eval_MaskRCNN(cfg, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name[0], gpu_num, 0, init=True)
+        else:
+            cfg, dataset_dicts_train, trainer = Train_MaskRCNN(config['dataroot'], config['traindir'], config['valdir'], config['classes'], weightsfolder[0], gpu_num, 0, init=False)
+            cfg = Eval_MaskRCNN(cfg, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name[0], gpu_num, 0, init=False)
+        
+        train_names = get_train_names(dataset_dicts_train, config['traindir'])
+        write_train_files(train_names, resultsfolder[0], 0)
 
     logger.info("Active learning is finished!")
