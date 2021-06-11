@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-11 13:36:44
+# @Last Modified time: 2021-06-11 19:08:40
 
 ## Active learning with Mask R-CNN
 
@@ -240,8 +240,8 @@ def Train_MaskRCNN(dataroot, traindir, valdir, classes, weightsfolder, gpu_num, 
     cfg.SOLVER.BASE_LR = 0.02
     cfg.SOLVER.GAMMA = 0.1
     cfg.SOLVER.WARMUP_ITERS = 1000
-    cfg.SOLVER.MAX_ITER = 5000
-    cfg.SOLVER.STEPS = (1000, 3000, 4000)
+    cfg.SOLVER.MAX_ITER = 10000
+    cfg.SOLVER.STEPS = (5000, 9000)
     cfg.SOLVER.CHECKPOINT_PERIOD = (cfg.SOLVER.MAX_ITER+1)
     cfg.TEST.EVAL_PERIOD = 500
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = len(classes)
@@ -254,7 +254,7 @@ def Train_MaskRCNN(dataroot, traindir, valdir, classes, weightsfolder, gpu_num, 
     return cfg, dataset_dicts_train, trainer
 
 
-def Eval_MaskRCNN(cfg, trainer, dataroot, testdir, classes, weightsfolder, resultsfolder, csv_name, gpu_num, iter, init):    
+def Eval_MaskRCNN(cfg, dataset_dicts_train, trainer, dataroot, testdir, classes, weightsfolder, resultsfolder, csv_name, gpu_num, iter, init):    
     if init:
         register_coco_instances("test", {}, os.path.join(dataroot, "test.json"), testdir)
         test_metadata = MetadataCatalog.get("test")
@@ -409,22 +409,26 @@ if __name__ == "__main__":
     weightsfolders, resultsfolders, csv_names = init_folders_and_files(config['weightsroot'], config['resultsroot'], config['classes'], config['strategies'], config['experiment_name'])
     remove_initial_training_set(config['dataroot'])
     prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
-    cfg, dataset_dicts_train, trainer = Train_MaskRCNN(config['dataroot'], config['traindir'], config['valdir'], config['classes'], weightsfolders[0], gpu_num, 0, init=True)
+    cfg, dataset_dicts_train_init, trainer = Train_MaskRCNN(config['dataroot'], config['traindir'], config['valdir'], config['classes'], weightsfolders[0], gpu_num, 0, init=True)
     
     ## do the evaluation with the same initial-weight-files
     for e, (weightsfolder, resultsfolder, csv_name) in enumerate(zip(weightsfolders, resultsfolders, csv_names)):
         if e == 0:
-            cfg_init = Eval_MaskRCNN(cfg, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, 0, init=True)
+            cfg_init = Eval_MaskRCNN(cfg, dataset_dicts_train_init, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, 0, init=True)
         else:
             copy_initial_weight_file(weightsfolders[0], weightsfolder, 0)
-            cfg_init = Eval_MaskRCNN(cfg, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, 0, init=False)
-        
-        train_names = get_train_names(dataset_dicts_train, config['traindir'])
+            cfg_init = Eval_MaskRCNN(cfg, dataset_dicts_train_init, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, 0, init=False)
+
+        train_names = get_train_names(dataset_dicts_train_init, config['traindir'])
         write_train_files(train_names, resultsfolder, 0)
 
     ## active-learning strategies
     for i, (strategy, mode, weightsfolder, resultsfolder, csv_name) in enumerate(zip(config['strategies'], config['mode'], weightsfolders, resultsfolders, csv_names)):
-        cfg = cfg_init
+        print(strategy)
+        ## load the initial_cfg to obtain the model-weights and image-names of the initial training
+        cfg = cfg_init 
+        train_names = get_train_names(dataset_dicts_train_init, config['traindir'])
+        print(len(train_names))
         
         for l in range(config['loops']):
             pool_list = create_pool_list(config, train_names)
@@ -439,7 +443,7 @@ if __name__ == "__main__":
                 cfg, dataset_dicts_train, trainer = Train_MaskRCNN(config['dataroot'], config['traindir'], config['valdir'], config['classes'], weightsfolder, gpu_num, l+1, init=False)
 
                 ## evaluate and write the pooled image-names to a txt-file
-                cfg = Eval_MaskRCNN(cfg, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, l+1, init=False)
+                cfg = Eval_MaskRCNN(cfg, dataset_dicts_train, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, l+1, init=False)
                 train_names = get_train_names(dataset_dicts_train, config['traindir'])
                 write_train_files(train_names, resultsfolder, l+1)
             else:
@@ -454,10 +458,10 @@ if __name__ == "__main__":
         
         if len(config['strategies']) == 0:
             cfg, dataset_dicts_train, trainer = Train_MaskRCNN(config['dataroot'], config['traindir'], config['valdir'], config['classes'], weightsfolder[0], gpu_num, 0, init=True)
-            cfg = Eval_MaskRCNN(cfg, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name[0], gpu_num, 0, init=True)
+            cfg = Eval_MaskRCNN(cfg, dataset_dicts_train, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name[0], gpu_num, 0, init=True)
         else:
             cfg, dataset_dicts_train, trainer = Train_MaskRCNN(config['dataroot'], config['traindir'], config['valdir'], config['classes'], weightsfolder[0], gpu_num, 0, init=False)
-            cfg = Eval_MaskRCNN(cfg, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name[0], gpu_num, 0, init=False)
+            cfg = Eval_MaskRCNN(cfg, dataset_dicts_train, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name[0], gpu_num, 0, init=False)
         
         train_names = get_train_names(dataset_dicts_train, config['traindir'])
         write_train_files(train_names, resultsfolder[0], 0)
