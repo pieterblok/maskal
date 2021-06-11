@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-03 16:27:05
+# @Last Modified time: 2021-06-11 11:38:23
 
 ## Active learning with Mask R-CNN
 
@@ -71,42 +71,33 @@ def check_direxcist(dir):
             os.makedirs(dir)  # make new folder
 
 
-def init_folders_and_files(weightsroot, resultsroot, classes, strategies, number=0):
+def init_folders_and_files(weightsroot, resultsroot, classes, strategies, name=''):
     weightsfolders = []
     resultsfolders = []
     csv_names = []
 
-    if number > 0:
-        for strat in range(len(strategies)):
-            strategy = strategies[strat]
-            weightsfolder = os.path.join(weightsroot, str(number), strategy)
-            check_direxcist(weightsfolder)
-            weightsfolders.append(weightsfolder)
-            
-            resultsfolder = os.path.join(resultsroot, str(number), strategy)
-            check_direxcist(resultsfolder)
-            resultsfolders.append(resultsfolder)
-
-            segm_strings = [c.replace(c, 'mAP-' + c) for c in classes]
-            write_strings = ['train_size', 'mAP'] + segm_strings
-            csv_name = strategy + '.csv'
-            csv_names.append(csv_name)
-
-            with open(os.path.join(resultsfolder, csv_name), 'w', newline='') as csvfile:
-                csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
-                csvwriter.writerow(write_strings)
-    else:
-        weightsfolders = os.path.join(weightsroot, strategies)
-        check_direxcist(weightsfolders)
+    for strat in range(len(strategies)):
+        strategy = strategies[strat]
+        if name:
+            weightsfolder = os.path.join(weightsroot, name, strategy)
+        else:
+            weightsfolder = os.path.join(weightsroot, strategy)
+        check_direxcist(weightsfolder)
+        weightsfolders.append(weightsfolder)
         
-        resultsfolders = os.path.join(resultsroot, strategies)
-        check_direxcist(resultsfolders)
+        if name:
+            resultsfolder = os.path.join(resultsroot, name, strategy)
+        else:
+            resultsfolder = os.path.join(resultsroot, strategy)
+        check_direxcist(resultsfolder)
+        resultsfolders.append(resultsfolder)
 
         segm_strings = [c.replace(c, 'mAP-' + c) for c in classes]
         write_strings = ['train_size', 'mAP'] + segm_strings
-        csv_names = strategies + '.csv'
+        csv_name = strategy + '.csv'
+        csv_names.append(csv_name)
 
-        with open(os.path.join(resultsfolders, csv_names), 'w', newline='') as csvfile:
+        with open(os.path.join(resultsfolder, csv_name), 'w', newline='') as csvfile:
             csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
             csvwriter.writerow(write_strings)
 
@@ -399,63 +390,61 @@ if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = config['cuda_visible_devices']
     gpu_num = len(config['cuda_visible_devices'])
 
+    weightsfolders, resultsfolders, csv_names = init_folders_and_files(config['weightsroot'], config['resultsroot'], config['classes'], config['strategies'], config['experiment_name'])
+    remove_initial_training_set(config['dataroot'])
+    max_entropy = calculate_max_entropy(config['classes'])
 
-    for n in range(config['no_experiments']):
-        weightsfolders, resultsfolders, csv_names = init_folders_and_files(config['weightsroot'], config['resultsroot'], config['classes'], config['strategies'], n+1)
-        remove_initial_training_set(config['dataroot'])
-        max_entropy = calculate_max_entropy(config['classes'])
+    for i, (strategy, mode) in enumerate(zip(config['strategies'], config['mode'])):
+        weightsfolder = weightsfolders[i]
+        resultsfolder = resultsfolders[i]
+        csv_name = csv_names[i]
 
-        for i, (strategy, mode) in enumerate(zip(config['strategies'], config['mode'])):
-            weightsfolder = weightsfolders[i]
-            resultsfolder = resultsfolders[i]
-            csv_name = csv_names[i]
-
-            if not os.path.exists(os.path.join(config['dataroot'], "initial_train.txt")):
-                prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
-            else:
-                initial_train_names = get_initial_train_names(config)
-                update_train_dataset(config['dataroot'], config['traindir'], config['classes'], initial_train_names)
+        if not os.path.exists(os.path.join(config['dataroot'], "initial_train.txt")):
+            prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
+        else:
+            initial_train_names = get_initial_train_names(config)
+            update_train_dataset(config['dataroot'], config['traindir'], config['classes'], initial_train_names)
 
 
-            ## perform the training on the initial dataset
-            if n == 0 and i == 0:
-                cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, init=True)
-            else:
+        ## perform the training on the initial dataset
+        if i == 0:
+            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, init=True)
+        else:
+            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, init=False)
+
+        train_names = get_train_names(dataset_dicts_train, config['traindir'])
+        write_train_files(train_names, resultsfolder, 0)
+
+
+        ## sampling of images
+        for l in range(config['loops']):    
+            pool_list = create_pool_list(config, train_names)
+
+            if strategy + '_pooling' in dir():
+                ## do the pooling (eval is a python-method that executes a function with a string-input)
+                pool = eval(strategy + '_pooling(pool_list, cfg, config, max_entropy, mode)')
+
+                ## update the training list and retrain the algorithm
+                train_list = train_names + list(pool.keys())
+                update_train_dataset(config['dataroot'], config['traindir'], config['classes'], train_list)
                 cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, init=False)
 
-            train_names = get_train_names(dataset_dicts_train, config['traindir'])
-            write_train_files(train_names, resultsfolder, 0)
-
-
-            ## sampling of images
-            for l in range(config['loops']):    
-                pool_list = create_pool_list(config, train_names)
-
-                if strategy + '_pooling' in dir():
-                    ## do the pooling
-                    pool = eval(strategy + '_pooling(pool_list, cfg, config, max_entropy, mode)') #eval runs a function as string-input
-
-                    ## update the training list and retrain the algorithm
-                    train_list = train_names + list(pool.keys())
-                    update_train_dataset(config['dataroot'], config['traindir'], config['classes'], train_list)
-                    cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, init=False)
-
-                    ## write the pooled image-names to a txt-file
-                    train_names = get_train_names(dataset_dicts_train, config['traindir'])
-                    write_train_files(train_names, resultsfolder, l+1)
-                else:
-                    logger.error(f"The {strategy}-strategy is not defined")
-                    sys.exit("Closing application")
+                ## write the pooled image-names to a txt-file
+                train_names = get_train_names(dataset_dicts_train, config['traindir'])
+                write_train_files(train_names, resultsfolder, l+1)
+            else:
+                logger.error(f"The {strategy}-strategy is not defined")
+                sys.exit("Closing application")
 
 
     ## train the complete train-pool to determine the base-line performance
     if config['train_complete_trainset']:
-        weightsfolder, resultsfolder, csv_name = init_folders_and_files(config['weightsroot'], config['resultsroot'], config['classes'], 'complete_trainset')
+        weightsfolder, resultsfolder, csv_name = init_folders_and_files(config['weightsroot'], config['resultsroot'], config['classes'], ['complete_trainset'])
         prepare_complete_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'])
         if len(config['strategies']) == 0:
-            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, init=True)
+            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name[0], gpu_num, init=True)
         else:
-            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, init=False)
+            cfg, dataset_dicts_train = Train_Eval(config['dataroot'], config['traindir'], config['valdir'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name[0], gpu_num, init=False)
         
 
     logger.info("Active learning is finished!")
