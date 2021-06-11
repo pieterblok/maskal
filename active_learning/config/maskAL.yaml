@@ -16,7 +16,7 @@ classes: ['healthy', 'damaged', 'matured', 'cateye', 'headrot']
 train_complete_trainset: False
 
 # active-learning sampling
-no_experiments: 1
+experiment_name: 'exp1'
 strategies: ['uncertainty', 'random', 'certainty']
 mode: ['min', ' ', 'max']
 initial_datasize: 500
