@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-11 19:08:40
+# @Last Modified time: 2021-06-13 11:12:12
 
 ## Active learning with Mask R-CNN
 
@@ -237,11 +237,11 @@ def Train_MaskRCNN(dataroot, traindir, valdir, classes, weightsfolder, gpu_num, 
     cfg.SOLVER.IMS_PER_BATCH = 2
     cfg.SOLVER.WEIGHT_DECAY = 0.0001
     cfg.SOLVER.LR_POLICY = 'steps_with_decay'
-    cfg.SOLVER.BASE_LR = 0.02
+    cfg.SOLVER.BASE_LR = 0.01
     cfg.SOLVER.GAMMA = 0.1
     cfg.SOLVER.WARMUP_ITERS = 1000
     cfg.SOLVER.MAX_ITER = 10000
-    cfg.SOLVER.STEPS = (5000, 9000)
+    cfg.SOLVER.STEPS = (6000, 9000)
     cfg.SOLVER.CHECKPOINT_PERIOD = (cfg.SOLVER.MAX_ITER+1)
     cfg.TEST.EVAL_PERIOD = 500
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = len(classes)
@@ -424,11 +424,9 @@ if __name__ == "__main__":
 
     ## active-learning strategies
     for i, (strategy, mode, weightsfolder, resultsfolder, csv_name) in enumerate(zip(config['strategies'], config['mode'], weightsfolders, resultsfolders, csv_names)):
-        print(strategy)
         ## load the initial_cfg to obtain the model-weights and image-names of the initial training
         cfg = cfg_init 
         train_names = get_train_names(dataset_dicts_train_init, config['traindir'])
-        print(len(train_names))
         
         for l in range(config['loops']):
             pool_list = create_pool_list(config, train_names)
