@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-13 11:12:12
+# @Last Modified time: 2021-06-14 16:34:21
 
 ## Active learning with Mask R-CNN
 
@@ -151,7 +151,7 @@ def write_train_files(train_names, writefolder, iteration):
     filehandle.close()
     
 
-def Train_MaskRCNN(dataroot, traindir, valdir, classes, weightsfolder, gpu_num, iter, init):
+def Train_MaskRCNN(dataroot, traindir, valdir, classes, weightsfolder, gpu_num, iter, transfer_learning, init):
     ## Hook to automatically save the best checkpoint
     class BestCheckpointer(HookBase):
         def __init__(self, iter, eval_period, metric):
@@ -223,8 +223,18 @@ def Train_MaskRCNN(dataroot, traindir, valdir, classes, weightsfolder, gpu_num, 
     cfg.MODEL.ROI_BOX_HEAD.NAME = 'FastRCNNConvFCHeadDropout'
     cfg.MODEL.ROI_HEADS.NAME = 'StandardROIHeadsDropout'
     cfg.MODEL.ROI_MASK_HEAD.NAME = 'MaskRCNNConvUpsampleHeadDropout'
-    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml")
     cfg.MODEL.ROI_HEADS.SOFTMAXES = False
+    cfg.OUTPUT_DIR = weightsfolder
+
+
+    ## initialize the network weights, with an option to do the transfer-learning on previous models
+    if transfer_learning == True:
+        if os.path.isfile(os.path.join(cfg.OUTPUT_DIR, "best_model_{:s}.pth".format(str(iter-1).zfill(3)))):
+            cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "best_model_{:s}.pth".format(str(iter-1).zfill(3)))
+        else:
+            cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml")
+    else:
+        cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml")
 
 
     ## initialize the training parameters  
@@ -240,12 +250,11 @@ def Train_MaskRCNN(dataroot, traindir, valdir, classes, weightsfolder, gpu_num, 
     cfg.SOLVER.BASE_LR = 0.01
     cfg.SOLVER.GAMMA = 0.1
     cfg.SOLVER.WARMUP_ITERS = 1000
-    cfg.SOLVER.MAX_ITER = 10000
-    cfg.SOLVER.STEPS = (6000, 9000)
+    cfg.SOLVER.MAX_ITER = 5000
+    cfg.SOLVER.STEPS = (3000, 4500)
     cfg.SOLVER.CHECKPOINT_PERIOD = (cfg.SOLVER.MAX_ITER+1)
     cfg.TEST.EVAL_PERIOD = 500
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = len(classes)
-    cfg.OUTPUT_DIR = weightsfolder
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
     trainer = CustomTrainer(cfg)
     trainer.resume_or_load(resume=False)
@@ -409,7 +418,7 @@ if __name__ == "__main__":
     weightsfolders, resultsfolders, csv_names = init_folders_and_files(config['weightsroot'], config['resultsroot'], config['classes'], config['strategies'], config['experiment_name'])
     remove_initial_training_set(config['dataroot'])
     prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
-    cfg, dataset_dicts_train_init, trainer = Train_MaskRCNN(config['dataroot'], config['traindir'], config['valdir'], config['classes'], weightsfolders[0], gpu_num, 0, init=True)
+    cfg, dataset_dicts_train_init, trainer = Train_MaskRCNN(config['dataroot'], config['traindir'], config['valdir'], config['classes'], weightsfolders[0], gpu_num, 0, config['transfer_learning_on_previous_models'], init=True)
     
     ## do the evaluation with the same initial-weight-files
     for e, (weightsfolder, resultsfolder, csv_name) in enumerate(zip(weightsfolders, resultsfolders, csv_names)):
@@ -438,7 +447,7 @@ if __name__ == "__main__":
                 ## update the training list and retrain the algorithm
                 train_list = train_names + list(pool.keys())
                 update_train_dataset(config['dataroot'], config['traindir'], config['classes'], train_list)
-                cfg, dataset_dicts_train, trainer = Train_MaskRCNN(config['dataroot'], config['traindir'], config['valdir'], config['classes'], weightsfolder, gpu_num, l+1, init=False)
+                cfg, dataset_dicts_train, trainer = Train_MaskRCNN(config['dataroot'], config['traindir'], config['valdir'], config['classes'], weightsfolder, gpu_num, l+1, config['transfer_learning_on_previous_models'], init=False)
 
                 ## evaluate and write the pooled image-names to a txt-file
                 cfg = Eval_MaskRCNN(cfg, dataset_dicts_train, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder, resultsfolder, csv_name, gpu_num, l+1, init=False)
@@ -455,10 +464,10 @@ if __name__ == "__main__":
         prepare_complete_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'])
         
         if len(config['strategies']) == 0:
-            cfg, dataset_dicts_train, trainer = Train_MaskRCNN(config['dataroot'], config['traindir'], config['valdir'], config['classes'], weightsfolder[0], gpu_num, 0, init=True)
+            cfg, dataset_dicts_train, trainer = Train_MaskRCNN(config['dataroot'], config['traindir'], config['valdir'], config['classes'], weightsfolder[0], gpu_num, 0, config['transfer_learning_on_previous_models'], init=True)
             cfg = Eval_MaskRCNN(cfg, dataset_dicts_train, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name[0], gpu_num, 0, init=True)
         else:
-            cfg, dataset_dicts_train, trainer = Train_MaskRCNN(config['dataroot'], config['traindir'], config['valdir'], config['classes'], weightsfolder[0], gpu_num, 0, init=False)
+            cfg, dataset_dicts_train, trainer = Train_MaskRCNN(config['dataroot'], config['traindir'], config['valdir'], config['classes'], weightsfolder[0], gpu_num, 0, config['transfer_learning_on_previous_models'], init=False)
             cfg = Eval_MaskRCNN(cfg, dataset_dicts_train, trainer, config['dataroot'], config['testdir'], config['classes'], weightsfolder[0], resultsfolder[0], csv_name[0], gpu_num, 0, init=False)
         
         train_names = get_train_names(dataset_dicts_train, config['traindir'])
