@@ -463,6 +463,7 @@ if __name__ == "__main__":
     config = process_config_file(config, ['strategies', 'mode', 'pool_size', 'dropout_probability', 'iterations'])
     os.environ["CUDA_VISIBLE_DEVICES"] = config['cuda_visible_devices']
     gpu_num = len(config['cuda_visible_devices'])
+    check_direxcist(config['dataroot'])
 
     if not config['train_complete_trainset']:
         weightsfolders, resultsfolders, csv_names = init_folders_and_files(config)
