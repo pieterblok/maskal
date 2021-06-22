@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-22 09:43:07
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-05-11 11:31:21
+# @Last Modified time: 2021-06-22 10:56:13
 
 #!/usr/bin/env python
 
@@ -40,7 +40,8 @@ class FastRCNNConvFCHeadDropout(nn.Sequential):
 
     @configurable
     def __init__(
-        self, input_shape: ShapeSpec, *, conv_dims: List[int], fc_dims: List[int], conv_norm=""
+        self, input_shape: ShapeSpec, *, conv_dims: List[int], fc_dims: List[int], conv_norm="",
+        dropout_probability: float = 0.5,
     ):
         """
         NOTE: this interface is experimental.
@@ -76,7 +77,7 @@ class FastRCNNConvFCHeadDropout(nn.Sequential):
         for k, fc_dim in enumerate(fc_dims):
             if k == 0:
                 self.add_module("flatten", nn.Flatten())
-            dropout = nn.Dropout(p=0.5)
+            dropout = nn.Dropout(p=dropout_probability)
             self.add_module("dropout{}".format(k + 1), dropout)
             fc = nn.Linear(int(np.prod(self._output_size)), fc_dim)
             self.add_module("fc{}".format(k + 1), fc)
@@ -100,6 +101,7 @@ class FastRCNNConvFCHeadDropout(nn.Sequential):
             "conv_dims": [conv_dim] * num_conv,
             "fc_dims": [fc_dim] * num_fc,
             "conv_norm": cfg.MODEL.ROI_BOX_HEAD.NORM,
+            "dropout_probability": cfg.MODEL.ROI_BOX_HEAD.DROPOUT_PROBABILITY,
         }
 
     def forward(self, x):
@@ -145,6 +147,7 @@ class FastRCNNOutputLayersDropout(nn.Module):
         box_reg_loss_type: str = "smooth_l1",
         loss_weight: Union[float, Dict[str, float]] = 1.0,
         softmaxes: bool = False,
+        dropout_probability: float = 0.5,
     ):
         """
         NOTE: this interface is experimental.
@@ -171,11 +174,11 @@ class FastRCNNOutputLayersDropout(nn.Module):
         self.num_classes = num_classes
         input_size = input_shape.channels * (input_shape.width or 1) * (input_shape.height or 1)
         # prediction layer for num_classes foreground classes and one background class (hence + 1)
-        self.dropout1 = nn.Dropout(p=0.5)
+        self.dropout1 = nn.Dropout(p=dropout_probability)
         self.cls_score = nn.Linear(input_size, num_classes + 1)
         num_bbox_reg_classes = 1 if cls_agnostic_bbox_reg else num_classes
         box_dim = len(box2box_transform.weights)
-        self.dropout2 = nn.Dropout(p=0.5)
+        self.dropout2 = nn.Dropout(p=dropout_probability)
         self.bbox_pred = nn.Linear(input_size, num_bbox_reg_classes * box_dim)
 
         nn.init.normal_(self.cls_score.weight, std=0.01)
@@ -210,6 +213,7 @@ class FastRCNNOutputLayersDropout(nn.Module):
             "box_reg_loss_type"     : cfg.MODEL.ROI_BOX_HEAD.BBOX_REG_LOSS_TYPE,
             "loss_weight"           : {"loss_box_reg": cfg.MODEL.ROI_BOX_HEAD.BBOX_REG_LOSS_WEIGHT},
             "softmaxes"             : cfg.MODEL.ROI_HEADS.SOFTMAXES,
+            "dropout_probability"   : cfg.MODEL.ROI_BOX_HEAD.DROPOUT_PROBABILITY,
             # fmt: on
         }
 
@@ -443,7 +447,8 @@ class MaskRCNNConvUpsampleHeadDropout(BaseMaskRCNNHead, nn.Sequential):
     """
 
     @configurable
-    def __init__(self, input_shape: ShapeSpec, *, num_classes, conv_dims, conv_norm="", **kwargs):
+    def __init__(self, input_shape: ShapeSpec, *, num_classes, conv_dims, conv_norm="", 
+            dropout_probability: float = 0.5, **kwargs):
         """
         NOTE: this interface is experimental.
 
@@ -477,7 +482,7 @@ class MaskRCNNConvUpsampleHeadDropout(BaseMaskRCNNHead, nn.Sequential):
             self.conv_norm_relus.append(conv)
             cur_channels = conv_dim
 
-        self.dropout1 = nn.Dropout(p=0.5)
+        self.dropout1 = nn.Dropout(p=dropout_probability)
 
         self.deconv = ConvTranspose2d(
             cur_channels, conv_dims[-1], kernel_size=2, stride=2, padding=0
@@ -485,7 +490,7 @@ class MaskRCNNConvUpsampleHeadDropout(BaseMaskRCNNHead, nn.Sequential):
         self.add_module("deconv_relu", nn.ReLU())
         cur_channels = conv_dims[-1]
 
-        self.dropout2 = nn.Dropout(p=0.5)
+        self.dropout2 = nn.Dropout(p=dropout_probability)
 
         self.predictor = Conv2d(cur_channels, num_classes, kernel_size=1, stride=1, padding=0)
 
@@ -510,6 +515,7 @@ class MaskRCNNConvUpsampleHeadDropout(BaseMaskRCNNHead, nn.Sequential):
             ret["num_classes"] = 1
         else:
             ret["num_classes"] = cfg.MODEL.ROI_HEADS.NUM_CLASSES
+        ret["dropout_probability"] = cfg.MODEL.ROI_MASK_HEAD.DROPOUT_PROBABILITY
         return ret
 
     def layers(self, x):

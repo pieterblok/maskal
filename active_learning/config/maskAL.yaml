@@ -15,14 +15,16 @@ cuda_visible_devices: '0'
 classes: ['healthy', 'damaged', 'matured', 'cateye', 'headrot']
 transfer_learning_on_previous_models: True
 train_complete_trainset: False
+duplicate_initial_model: True
 
 # active-learning sampling
 experiment_name: 'exp1'
 strategies: ['uncertainty', 'random', 'certainty']
-mode: ['min', ' ', 'max']
-initial_datasize: 500
-pool_size: 250
-loops: 10
+mode: ['min', ' ', 'mean']
+initial_datasize: 200
+pool_size: 200
+loops: 14
+dropout_probability: 0.5
 iterations: 5
 batch_size: 5
 iou_thres: 0.5

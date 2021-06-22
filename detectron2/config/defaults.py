@@ -311,6 +311,8 @@ _C.MODEL.ROI_BOX_HEAD.NORM = ""
 _C.MODEL.ROI_BOX_HEAD.CLS_AGNOSTIC_BBOX_REG = False
 # If true, RoI heads use bounding boxes predicted by the box head rather than proposal boxes.
 _C.MODEL.ROI_BOX_HEAD.TRAIN_ON_PRED_BOXES = False
+# Dropout-probability for Monte-Carlo dropout
+_C.MODEL.ROI_BOX_HEAD.DROPOUT_PROBABILITY = 0.5
 
 # ---------------------------------------------------------------------------- #
 # Cascaded Box Head
@@ -341,6 +343,8 @@ _C.MODEL.ROI_MASK_HEAD.NORM = ""
 _C.MODEL.ROI_MASK_HEAD.CLS_AGNOSTIC_MASK = False
 # Type of pooling operation applied to the incoming feature map for each RoI
 _C.MODEL.ROI_MASK_HEAD.POOLER_TYPE = "ROIAlignV2"
+# Dropout-probability for Monte-Carlo dropout
+_C.MODEL.ROI_MASK_HEAD.DROPOUT_PROBABILITY = 0.5
 
 
 # ---------------------------------------------------------------------------- #
