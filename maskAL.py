@@ -496,11 +496,14 @@ if __name__ == "__main__":
                 val_value = val_value_init
             else:
                 ## train and evaluate Mask R-CNN on the initial dataset with different settings
-                if i > 0:
+                if i == 0:
+                    cfg, dataset_dicts_train, trainer, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, 0, 0, dropout_probability, init=True)
+                    cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, trainer, weightsfolder, resultsfolder, csv_name, gpu_num, 0, init=True)
+                else:
                     initial_train_names = get_initial_train_names(config)
                     update_train_dataset(config['dataroot'], config['traindir'], config['classes'], initial_train_names)
-                cfg, dataset_dicts_train, trainer, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, 0, 0, dropout_probability, init=True)
-                cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, trainer, weightsfolder, resultsfolder, csv_name, gpu_num, 0, init=True)
+                    cfg, dataset_dicts_train, trainer, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, 0, 0, dropout_probability, init=False)
+                    cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, trainer, weightsfolder, resultsfolder, csv_name, gpu_num, 0, init=False)
                 train_names = get_train_names(dataset_dicts_train, config['traindir'])
                 write_train_files(train_names, resultsfolder, 0)
             
