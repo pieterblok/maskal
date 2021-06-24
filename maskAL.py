@@ -296,7 +296,7 @@ def Train_MaskRCNN(config, weightsfolder, gpu_num, iter, val_value, dropout_prob
     cfg.DATASETS.TEST = ("val",)
     cfg.NUM_GPUS = gpu_num
     cfg.DATALOADER.NUM_WORKERS = config['num_workers']
-    cfg.SOLVER.IMS_PER_BATCH = config['batch_size']
+    cfg.SOLVER.IMS_PER_BATCH = config['train_batch_size']
     cfg.SOLVER.WEIGHT_DECAY = config['weight_decay']
     cfg.SOLVER.LR_POLICY = config['learning_policy']
     cfg.SOLVER.BASE_LR = config['learning_rate']
@@ -361,7 +361,7 @@ def Eval_MaskRCNN(cfg, config, dataset_dicts_train, trainer, weightsfolder, resu
 def uncertainty_pooling(pool_list, pool_size, cfg, config, max_entropy, mcd_iterations, mode):
     pool = {}
     cfg.MODEL.ROI_HEADS.SOFTMAXES = True
-    predictor = MonteCarloDropout(cfg, mcd_iterations, config['batch_size'])
+    predictor = MonteCarloDropout(cfg, mcd_iterations, config['al_batch_size'])
     device = cfg.MODEL.DEVICE
 
     if len(pool_list) > 0:
@@ -397,7 +397,7 @@ def uncertainty_pooling(pool_list, pool_size, cfg, config, max_entropy, mcd_iter
 def certainty_pooling(pool_list, pool_size, cfg, config, max_entropy, mcd_iterations, mode):
     pool = {}
     cfg.MODEL.ROI_HEADS.SOFTMAXES = True
-    predictor = MonteCarloDropout(cfg, mcd_iterations, config['batch_size'])
+    predictor = MonteCarloDropout(cfg, mcd_iterations, config['al_batch_size'])
     device = cfg.MODEL.DEVICE
 
     if len(pool_list) > 0:
