@@ -295,17 +295,17 @@ def Train_MaskRCNN(config, weightsfolder, gpu_num, iter, val_value, dropout_prob
     cfg.DATASETS.TRAIN = ("train",)
     cfg.DATASETS.TEST = ("val",)
     cfg.NUM_GPUS = gpu_num
-    cfg.DATALOADER.NUM_WORKERS = 2
-    cfg.SOLVER.IMS_PER_BATCH = 2
-    cfg.SOLVER.WEIGHT_DECAY = 0.0001
-    cfg.SOLVER.LR_POLICY = 'steps_with_decay'
-    cfg.SOLVER.BASE_LR = 0.01
-    cfg.SOLVER.GAMMA = 0.1
-    cfg.SOLVER.WARMUP_ITERS = 1000
-    cfg.SOLVER.MAX_ITER = 5000
-    cfg.SOLVER.STEPS = (3000, 4500)
+    cfg.DATALOADER.NUM_WORKERS = config['num_workers']
+    cfg.SOLVER.IMS_PER_BATCH = config['batch_size']
+    cfg.SOLVER.WEIGHT_DECAY = config['weight_decay']
+    cfg.SOLVER.LR_POLICY = config['learning_policy']
+    cfg.SOLVER.BASE_LR = config['learning_rate']
+    cfg.SOLVER.GAMMA = config['gamma']
+    cfg.SOLVER.WARMUP_ITERS = config['warmup_iterations']
+    cfg.SOLVER.MAX_ITER = config['max_iterations']
+    cfg.SOLVER.STEPS = config['steps']
     cfg.SOLVER.CHECKPOINT_PERIOD = (cfg.SOLVER.MAX_ITER+1)
-    cfg.TEST.EVAL_PERIOD = 500
+    cfg.TEST.EVAL_PERIOD = config['eval_period']
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = len(config['classes'])
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
     trainer = CustomTrainer(cfg)
@@ -334,8 +334,8 @@ def Eval_MaskRCNN(cfg, config, dataset_dicts_train, trainer, weightsfolder, resu
     except:
         cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")
         
-    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5   # set the testing threshold for this model
-    cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.01
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = config['confidence_threshold']   # set the testing threshold for this model
+    cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = config['nms_threshold']
     cfg.DATASETS.TEST = ("test",)
     predictor = DefaultPredictor(cfg)
     evaluator = COCOEvaluator("test", ("bbox", "segm"), False, output_dir=resultsfolder)
