@@ -67,7 +67,8 @@ Tested with: Pytorch 1.8.0 and torchvision 0.9.0<br/>
 - pip install datasets
 - pip install onnx
 - pip install baal 
-- pip install xmltodict <br/> <br/>
+- pip install xmltodict 
+- pip install seaborn <br/> <br/>
 
 **2.5) Reboot/restart the computer (sudo reboot)** <br/> <br/>
 
