@@ -290,8 +290,8 @@ def Train_MaskRCNN(config, weightsfolder, gpu_num, iter, val_value, dropout_prob
 
 
     ## initialize the training parameters  
-    cfg.DATALOADER.SAMPLER_TRAIN = "RepeatFactorTrainingSampler"
-    cfg.DATALOADER.REPEAT_THRESHOLD = 0.001
+    cfg.DATALOADER.SAMPLER_TRAIN = config['train_sampler']
+    cfg.DATALOADER.REPEAT_THRESHOLD = config['repeat_threshold']
     cfg.DATASETS.TRAIN = ("train",)
     cfg.DATASETS.TEST = ("val",)
     cfg.NUM_GPUS = gpu_num

@@ -13,6 +13,8 @@ testdir: "./datasets/test"
 # training-parameters
 cuda_visible_devices: '0'
 classes: ['healthy', 'damaged', 'matured', 'cateye', 'headrot']
+train_sampler: "RepeatFactorTrainingSampler"
+repeat_threshold: 0.001
 transfer_learning_on_previous_models: True
 train_complete_trainset: False
 duplicate_initial_model: True
