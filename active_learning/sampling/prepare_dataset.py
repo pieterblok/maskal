@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-03 11:26:17
+# @Last Modified time: 2021-06-29 09:44:27
 
 import sys
 import random
@@ -712,6 +712,30 @@ def check_json_presence(imgdir, dataset, name):
             time.sleep(1)
             shutil.rmtree(annot_folder)
 
+
+def calculate_repeat_threshold(config, dataset_dicts_train):
+    images_with_class_annotations = np.zeros(len(config['classes'])).astype(np.int16)
+    for d in range(len(dataset_dicts_train)):
+        data_point = dataset_dicts_train[d]
+        classes_annot = []
+        for k in range(len(data_point["annotations"])):
+            classes_annot.append(data_point["annotations"][k]['category_id'])
+        unique_classes = list(set(classes_annot))
+        for c in unique_classes:
+            images_with_class_annotations[c] += 1
+
+    max_value = 0
+    for mc in range(len(config['minority_classes'])):
+        minorty_class = config['minority_classes'][mc]
+        search_id = config['classes'].index(minorty_class)
+        image_count = images_with_class_annotations[search_id]
+
+        if image_count > max_value:
+            max_value = image_count
+    
+    repeat_threshold = (max_value / len(dataset_dicts_train)) * config['oversample_factor']
+    return float(repeat_threshold)
+    
 
 def prepare_initial_dataset_randomly(rootdir, imgdir, classes, train_val_test_split, initial_datasize):
     rename_xml_files(imgdir)

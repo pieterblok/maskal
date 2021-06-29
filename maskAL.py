@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-22 11:46:46
+# @Last Modified time: 2021-06-29 09:45:29
 
 ## Active learning with Mask R-CNN
 
@@ -43,7 +43,7 @@ import detectron2.utils.comm as comm
 from active_learning.strategies.dropout import FastRCNNConvFCHeadDropout
 from active_learning.strategies.dropout import FastRCNNOutputLayersDropout
 from active_learning.strategies.dropout import MaskRCNNConvUpsampleHeadDropout
-from active_learning.sampling import prepare_initial_dataset, update_train_dataset, prepare_complete_dataset
+from active_learning.sampling import prepare_initial_dataset, update_train_dataset, prepare_complete_dataset, calculate_repeat_threshold
 from active_learning.sampling.montecarlo_dropout import MonteCarloDropout
 from active_learning.sampling import observations
 from active_learning.heuristics import uncertainty
@@ -289,9 +289,14 @@ def Train_MaskRCNN(config, weightsfolder, gpu_num, iter, val_value, dropout_prob
         cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml")
 
 
-    ## initialize the training parameters  
+    ## initialize the train-sampler
     cfg.DATALOADER.SAMPLER_TRAIN = config['train_sampler']
-    cfg.DATALOADER.REPEAT_THRESHOLD = config['repeat_threshold']
+    if cfg.DATALOADER.SAMPLER_TRAIN == 'RepeatFactorTrainingSampler':
+        repeat_threshold = calculate_repeat_threshold(config, dataset_dicts_train)
+        cfg.DATALOADER.REPEAT_THRESHOLD = repeat_threshold
+        
+
+    ## initialize the training parameters  
     cfg.DATASETS.TRAIN = ("train",)
     cfg.DATASETS.TEST = ("val",)
     cfg.NUM_GPUS = gpu_num

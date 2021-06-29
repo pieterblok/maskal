@@ -13,8 +13,6 @@ testdir: "./datasets/test"
 # training-parameters
 cuda_visible_devices: '0'
 classes: ['healthy', 'damaged', 'matured', 'cateye', 'headrot']
-train_sampler: "RepeatFactorTrainingSampler"
-repeat_threshold: 0.001
 transfer_learning_on_previous_models: True
 train_complete_trainset: False
 duplicate_initial_model: True
@@ -28,6 +26,11 @@ learning_policy: 'steps_with_decay'
 gamma: 0.1
 train_batch_size: 2
 num_workers: 2
+
+# train-sampler
+train_sampler: "TrainingSampler"
+minority_classes: ['damaged', 'matured', 'cateye', 'headrot']
+oversample_factor: 2
 
 # evaluation-parameters
 confidence_threshold: 0.5
