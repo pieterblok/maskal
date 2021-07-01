@@ -1,4 +1,4 @@
-## Installation, based on your OS-preference, choose to install CUDA 10.1 (1a) or 11.1 (1b)
+## Installation (based on your OS-preference, choose to install CUDA 10.1 (step 1a) or 11.1 (step 1b))
 
 ## 1a.) Install CUDA 10.1 (if not yet installed) 
 Tested on: Ubuntu 16.04 and 18.04, CUDA: 10.1 (10.1.105)<br/> 
