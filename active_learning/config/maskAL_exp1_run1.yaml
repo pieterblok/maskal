@@ -5,7 +5,7 @@
 # folders
 weightsroot: "./weights"
 resultsroot: "./results"
-dataroot: "./datasets"
+dataroot: "./datasets/exp1/run1"
 traindir: "./datasets/train"
 valdir: "./datasets/val"
 testdir: "./datasets/test"
@@ -15,7 +15,7 @@ cuda_visible_devices: '0'
 classes: ['healthy', 'damaged', 'matured', 'cateye', 'headrot']
 transfer_learning_on_previous_models: True
 train_complete_trainset: False
-duplicate_initial_model: True
+duplicate_initial_model: False
 learning_rate: 0.01
 warmup_iterations: 1000
 max_iterations: 10000
@@ -28,7 +28,7 @@ train_batch_size: 2
 num_workers: 2
 
 # train-sampler
-train_sampler: "TrainingSampler"
+train_sampler: "RepeatFactorTrainingSampler"
 minority_classes: ['damaged', 'matured', 'cateye', 'headrot']
 oversample_factor: 2
 
@@ -37,13 +37,13 @@ confidence_threshold: 0.5
 nms_threshold: 0.01
 
 # active-learning sampling
-experiment_name: 'exp1'
-strategies: ['uncertainty', 'random', 'certainty']
-mode: ['min', ' ', 'mean']
+experiment_name: 'exp1/run1'
+strategies: ['uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty']
+mode: ['min', 'min', 'min', 'mean', 'mean', 'mean']
 initial_datasize: 100
 pool_size: 200
 loops: 12
-dropout_probability: 0.5
+dropout_probability: [0.25, 0.50, 0.75, 0.25, 0.50, 0.75]
 iterations: 5
 al_batch_size: 5
 iou_thres: 0.5
