@@ -64,7 +64,7 @@ export LD_LIBRARY_PATH=/usr/local/cuda-11.1/lib64${LD_LIBRARY_PATH:+:${LD_LIBRAR
 
 
 ## 2.) Install maskAL in a virtual environment (using Anaconda)
-Tested with: Pytorch 1.8.0 and torchvision 0.9.0 (Ubuntu 16.04/18.04 and CUDA 10.1) and Pytorch 1.7.1 and torchvision 0.8.2 (Ubuntu 20.04 and CUDA 11.1)<br/>
+Tested with: Pytorch 1.8.0 & torchvision 0.9.0 (Ubuntu 16.04/18.04 and CUDA 10.1) and Pytorch 1.7.1 & torchvision 0.8.2 (Ubuntu 20.04 and CUDA 11.1)<br/>
 
 **2.1) Download and install Anaconda:**
 - download anaconda: https://www.anaconda.com/distribution/#download-section (python 3.x version)
