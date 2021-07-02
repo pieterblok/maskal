@@ -121,16 +121,15 @@ def init_folders_and_files(config):
                 csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
                 csvwriter.writerow(write_strings)
     else:
-        folder_name = 'complete_trainset'
-        weightsfolders = os.path.join(config['weightsroot'], folder_name)            
+        weightsfolders = os.path.join(config['weightsroot'], config['experiment_name'])            
         check_direxcist(weightsfolders)
         
-        resultsfolders = os.path.join(config['resultsroot'], folder_name)
+        resultsfolders = os.path.join(config['resultsroot'], config['experiment_name'])
         check_direxcist(resultsfolders)
 
         segm_strings = [c.replace(c, 'mAP-' + c) for c in config['classes']]
         write_strings = ['train_size', 'mAP'] + segm_strings
-        csv_names = folder_name + '.csv'
+        csv_names = os.path.basename(config['experiment_name']) + '.csv'
 
         with open(os.path.join(resultsfolders, csv_names), 'w', newline='') as csvfile:
             csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
