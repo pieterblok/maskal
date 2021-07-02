@@ -5,21 +5,21 @@
 # folders
 weightsroot: "./weights"
 resultsroot: "./results"
-dataroot: "./datasets"
+dataroot: "./datasets/exp1/repeat_factor_training_sampler_3"
 traindir: "./datasets/train"
 valdir: "./datasets/val"
 testdir: "./datasets/test"
 
 # training-parameters
-cuda_visible_devices: '0'
+cuda_visible_devices: '2'
 classes: ['healthy', 'damaged', 'matured', 'cateye', 'headrot']
-transfer_learning_on_previous_models: True
-train_complete_trainset: False
-duplicate_initial_model: True
+transfer_learning_on_previous_models: False
+train_complete_trainset: True
+duplicate_initial_model: False
 learning_rate: 0.01
 warmup_iterations: 1000
-max_iterations: 10000
-steps: [6000, 9000]
+max_iterations: 50000
+steps: [30000, 45000]
 eval_period: 500
 weight_decay: 0.0001
 learning_policy: 'steps_with_decay'
@@ -28,16 +28,16 @@ train_batch_size: 1
 num_workers: 2
 
 # train-sampler
-train_sampler: "TrainingSampler"
+train_sampler: "RepeatFactorTrainingSampler"
 minority_classes: ['damaged', 'matured', 'cateye', 'headrot']
-oversample_factor: 2
+oversample_factor: 3
 
 # evaluation-parameters
 confidence_threshold: 0.5
 nms_threshold: 0.01
 
 # active-learning sampling
-experiment_name: 'exp1'
+experiment_name: 'exp1/repeat_factor_training_sampler_3'
 strategies: ['uncertainty', 'random', 'certainty']
 mode: ['min', ' ', 'mean']
 initial_datasize: 100
