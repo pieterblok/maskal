@@ -18,8 +18,8 @@ train_complete_trainset: True
 duplicate_initial_model: False
 learning_rate: 0.01
 warmup_iterations: 1000
-max_iterations: 50000
-steps: [30000, 45000]
+max_iterations: 140000
+steps: [84000, 126000]
 eval_period: 500
 weight_decay: 0.0001
 learning_policy: 'steps_with_decay'
