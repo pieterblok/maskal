@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-29 09:44:27
+# @Last Modified time: 2021-07-05 11:48:37
 
 import sys
 import random
@@ -735,6 +735,16 @@ def calculate_repeat_threshold(config, dataset_dicts_train):
     
     repeat_threshold = (max_value / len(dataset_dicts_train)) * config['oversample_factor']
     return float(repeat_threshold)
+
+
+def calculate_iterations(config, dataset_dicts_train):
+    div_factor = math.ceil(len(dataset_dicts_train)/config['step_image_number'])
+    if div_factor == 1:
+        max_iterations = config['train_iterations_base']
+    else:
+        max_iterations = config['train_iterations_base'] + ((div_factor - 1) * config['train_iterations_step_size'])
+    steps = [int(s * max_iterations) for s in config['step_ratios']]
+    return int(max_iterations), steps
     
 
 def prepare_initial_dataset_randomly(rootdir, imgdir, classes, train_val_test_split, initial_datasize):

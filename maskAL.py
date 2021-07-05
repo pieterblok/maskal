@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-29 09:45:29
+# @Last Modified time: 2021-07-05 11:47:49
 
 ## Active learning with Mask R-CNN
 
@@ -43,7 +43,7 @@ import detectron2.utils.comm as comm
 from active_learning.strategies.dropout import FastRCNNConvFCHeadDropout
 from active_learning.strategies.dropout import FastRCNNOutputLayersDropout
 from active_learning.strategies.dropout import MaskRCNNConvUpsampleHeadDropout
-from active_learning.sampling import prepare_initial_dataset, update_train_dataset, prepare_complete_dataset, calculate_repeat_threshold
+from active_learning.sampling import prepare_initial_dataset, update_train_dataset, prepare_complete_dataset, calculate_repeat_threshold, calculate_iterations
 from active_learning.sampling.montecarlo_dropout import MonteCarloDropout
 from active_learning.sampling import observations
 from active_learning.heuristics import uncertainty
@@ -294,6 +294,7 @@ def Train_MaskRCNN(config, weightsfolder, gpu_num, iter, val_value, dropout_prob
         repeat_threshold = calculate_repeat_threshold(config, dataset_dicts_train)
         cfg.DATALOADER.REPEAT_THRESHOLD = repeat_threshold
         
+    max_iterations, steps = calculate_iterations(config, dataset_dicts_train)
 
     ## initialize the training parameters  
     cfg.DATASETS.TRAIN = ("train",)
@@ -306,8 +307,8 @@ def Train_MaskRCNN(config, weightsfolder, gpu_num, iter, val_value, dropout_prob
     cfg.SOLVER.BASE_LR = config['learning_rate']
     cfg.SOLVER.GAMMA = config['gamma']
     cfg.SOLVER.WARMUP_ITERS = config['warmup_iterations']
-    cfg.SOLVER.MAX_ITER = config['max_iterations']
-    cfg.SOLVER.STEPS = config['steps']
+    cfg.SOLVER.MAX_ITER = max_iterations
+    cfg.SOLVER.STEPS = steps
     cfg.SOLVER.CHECKPOINT_PERIOD = (cfg.SOLVER.MAX_ITER+1)
     cfg.TEST.EVAL_PERIOD = config['eval_period']
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = len(config['classes'])

@@ -17,14 +17,16 @@ transfer_learning_on_previous_models: True
 train_complete_trainset: False
 duplicate_initial_model: True
 learning_rate: 0.01
-warmup_iterations: 1000
-max_iterations: 10000
-steps: [6000, 9000]
+warmup_iterations: 500
+train_iterations_base: 2500
+train_iterations_step_size: 2500
+step_image_number: 500
+step_ratios: [0.5, 0.8]
 eval_period: 500
 weight_decay: 0.0001
 learning_policy: 'steps_with_decay'
 gamma: 0.1
-train_batch_size: 1
+train_batch_size: 2
 num_workers: 2
 
 # train-sampler
