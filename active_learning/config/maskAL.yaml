@@ -32,7 +32,7 @@ num_workers: 2
 # train-sampler
 train_sampler: "TrainingSampler"
 minority_classes: ['damaged', 'matured', 'cateye', 'headrot']
-oversample_factor: 2
+repeat_factor_smallest_class: 1.0
 
 # evaluation-parameters
 confidence_threshold: 0.5

@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-07-05 11:48:37
+# @Last Modified time: 2021-07-06 11:25:45
 
 import sys
 import random
@@ -713,6 +713,7 @@ def check_json_presence(imgdir, dataset, name):
             shutil.rmtree(annot_folder)
 
 
+## the function below is heavily inspired by the function "repeat_factors_from_category_frequency" in maskAL/detectron2/data/samplers/distributed_sampler.py
 def calculate_repeat_threshold(config, dataset_dicts_train):
     images_with_class_annotations = np.zeros(len(config['classes'])).astype(np.int16)
     for d in range(len(dataset_dicts_train)):
@@ -724,16 +725,18 @@ def calculate_repeat_threshold(config, dataset_dicts_train):
         for c in unique_classes:
             images_with_class_annotations[c] += 1
 
-    max_value = 0
     for mc in range(len(config['minority_classes'])):
         minorty_class = config['minority_classes'][mc]
         search_id = config['classes'].index(minorty_class)
         image_count = images_with_class_annotations[search_id]
 
-        if image_count > max_value:
-            max_value = image_count
+        try:
+            if image_count < min_value:
+                min_value = image_count
+        except:
+            min_value = image_count
     
-    repeat_threshold = (max_value / len(dataset_dicts_train)) * config['oversample_factor']
+    repeat_threshold = np.power(config['repeat_factor_smallest_class'], 2) * (min_value / len(dataset_dicts_train))
     return float(repeat_threshold)
 
 
