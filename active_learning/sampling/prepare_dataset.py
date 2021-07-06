@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-07-06 11:25:45
+# @Last Modified time: 2021-07-06 11:52:00
 
 import sys
 import random
@@ -737,6 +737,7 @@ def calculate_repeat_threshold(config, dataset_dicts_train):
             min_value = image_count
     
     repeat_threshold = np.power(config['repeat_factor_smallest_class'], 2) * (min_value / len(dataset_dicts_train))
+    repeat_threshold = np.clip(repeat_threshold, 0, 1)
     return float(repeat_threshold)
 
 
