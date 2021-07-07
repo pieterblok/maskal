@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-07-06 11:54:45
+# @Last Modified time: 2021-07-07 14:21:00
 
 ## Active learning with Mask R-CNN
 
@@ -98,7 +98,7 @@ def init_folders_and_files(config):
         counts = list(counts.values())
         duplicates = any(x > 1 for x in counts)
 
-        for s, (strategy, mode, dropout_probability, mcd_iterations, pool_size) in enumerate(zip(config['strategies'], config['mode'], config['dropout_probability'], config['iterations'], config['pool_size'])):
+        for s, (strategy, mode, dropout_probability, mcd_iterations, pool_size) in enumerate(zip(config['strategies'], config['mode'], config['dropout_probability'], config['mcd_iterations'], config['pool_size'])):
             if duplicates:
                 folder_name = strategy + "_" + mode + "_" + "{:.2f}".format(dropout_probability) + "_" + str(mcd_iterations) + "_" + str(pool_size)
             else:
@@ -465,16 +465,17 @@ if __name__ == "__main__":
     for key, value in config.items():
         print(key, ':', value)
 
-    config = process_config_file(config, ['strategies', 'mode', 'pool_size', 'dropout_probability', 'iterations'])
+    config = process_config_file(config, ['strategies', 'mode', 'pool_size', 'dropout_probability', 'mcd_iterations'])
     os.environ["CUDA_VISIBLE_DEVICES"] = config['cuda_visible_devices']
     gpu_num = len(config['cuda_visible_devices'])
     check_direxcist(config['dataroot'])
 
     if not config['train_complete_trainset']:
         weightsfolders, resultsfolders, csv_names = init_folders_and_files(config)
-        remove_initial_training_set(config['dataroot'])
-        prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
-        
+        if not config['resume']:
+            remove_initial_training_set(config['dataroot'])
+            prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
+            
         if config['duplicate_initial_model']:
             ## train Mask R-CNN on the initial-dataset and duplicate the results on the other strategies
             cfg, dataset_dicts_train_init, trainer, val_value_init = Train_MaskRCNN(config, weightsfolders[0], gpu_num, 0, 0, config['dropout_probability'][0], init=True)
@@ -493,7 +494,7 @@ if __name__ == "__main__":
         max_entropy = calculate_max_entropy(config['classes'])
 
         ## active-learning strategies
-        for i, (strategy, pool_size, mcd_iterations, mode, dropout_probability, weightsfolder, resultsfolder, csv_name) in enumerate(zip(config['strategies'], config['pool_size'], config['iterations'], config['mode'], config['dropout_probability'], weightsfolders, resultsfolders, csv_names)):
+        for i, (strategy, pool_size, mcd_iterations, mode, dropout_probability, weightsfolder, resultsfolder, csv_name) in enumerate(zip(config['strategies'], config['pool_size'], config['mcd_iterations'], config['mode'], config['dropout_probability'], weightsfolders, resultsfolders, csv_names)):
             if config['duplicate_initial_model']:
                 ## load the initial_cfg to obtain the model-weights and image-names of the initial training
                 cfg = cfg_init 
