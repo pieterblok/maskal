@@ -475,6 +475,9 @@ if __name__ == "__main__":
         if not config['resume']:
             remove_initial_training_set(config['dataroot'])
             prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
+        else:
+            initial_train_names = get_initial_train_names(config)
+            update_train_dataset(config['dataroot'], config['traindir'], config['classes'], initial_train_names)
             
         if config['duplicate_initial_model']:
             ## train Mask R-CNN on the initial-dataset and duplicate the results on the other strategies
