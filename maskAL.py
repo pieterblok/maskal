@@ -181,11 +181,13 @@ def write_train_files(train_names, writefolder, iteration, pool={}):
     with open(os.path.join(writefolder, write_txt_name), 'w') as filehandle:
         for train_name in train_names:
             if bool(pool) == True:
+                written = False
                 for name, val in pool.items():
                     if name == train_name:
                         filehandle.write("{:s}, {:.6f}\n".format(name, val))
-                    else:
-                        filehandle.write("{:s}, NaN\n".format(train_name))
+                        written = True
+                if written == False:
+                    filehandle.write("{:s}, NaN\n".format(train_name))
             else:
                 filehandle.write("{:s}, NaN\n".format(train_name))
     filehandle.close()
