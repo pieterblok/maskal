@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-07-07 14:21:00
+# @Last Modified time: 2021-07-08 14:44:10
 
 ## Active learning with Mask R-CNN
 
@@ -176,11 +176,18 @@ def create_pool_list(config, train_names):
     return pool_list
 
 
-def write_train_files(train_names, writefolder, iteration):
+def write_train_files(train_names, writefolder, iteration, pool={}):
     write_txt_name = "trainfiles_iteration{:03d}.txt".format(iteration)
     with open(os.path.join(writefolder, write_txt_name), 'w') as filehandle:
         for train_name in train_names:
-            filehandle.write("{:s}\n".format(train_name))
+            if bool(pool) == True:
+                for name, val in pool.items():
+                    if name == train_name:
+                        filehandle.write("{:s}, {:.6f}\n".format(name, val))
+                    else:
+                        filehandle.write("{:s}, NaN\n".format(train_name))
+            else:
+                filehandle.write("{:s}, NaN\n".format(train_name))
     filehandle.close()
 
 
@@ -534,7 +541,7 @@ if __name__ == "__main__":
                     ## evaluate and write the pooled image-names to a txt-file
                     cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, trainer, weightsfolder, resultsfolder, csv_name, gpu_num, l+1, init=False)
                     train_names = get_train_names(dataset_dicts_train, config['traindir'])
-                    write_train_files(train_names, resultsfolder, l+1)
+                    write_train_files(train_names, resultsfolder, l+1, pool)
                 else:
                     logger.error(f"The {strategy}-strategy is not defined")
                     sys.exit("Closing application")
