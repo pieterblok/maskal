@@ -47,6 +47,7 @@ pool_size: 200
 loops: 12
 dropout_probability: [0.25, 0.50, 0.75, 0.25, 0.50, 0.75, 0.25, 0.50, 0.75, 0.25, 0.50, 0.75, 0.25, 0.50, 0.75, 0.25, 0.50, 0.75]
 mcd_iterations: [3, 3, 3, 6, 6, 6, 9, 9, 9, 3, 3, 3, 6, 6, 6, 9, 9, 9]
-al_batch_size: 5
+dropout_method: 'head'
+al_batch_size: 3
 iou_thres: 0.5
 resume: False

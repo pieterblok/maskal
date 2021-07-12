@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-07-08 14:44:10
+# @Last Modified time: 2021-07-12 13:43:19
 
 ## Active learning with Mask R-CNN
 
@@ -44,7 +44,7 @@ from active_learning.strategies.dropout import FastRCNNConvFCHeadDropout
 from active_learning.strategies.dropout import FastRCNNOutputLayersDropout
 from active_learning.strategies.dropout import MaskRCNNConvUpsampleHeadDropout
 from active_learning.sampling import prepare_initial_dataset, update_train_dataset, prepare_complete_dataset, calculate_repeat_threshold, calculate_iterations
-from active_learning.sampling.montecarlo_dropout import MonteCarloDropout
+from active_learning.sampling.montecarlo_dropout import MonteCarloDropout, MonteCarloDropoutHead
 from active_learning.sampling import observations
 from active_learning.heuristics import uncertainty
 
@@ -375,7 +375,12 @@ def Eval_MaskRCNN(cfg, config, dataset_dicts_train, trainer, weightsfolder, resu
 def uncertainty_pooling(pool_list, pool_size, cfg, config, max_entropy, mcd_iterations, mode):
     pool = {}
     cfg.MODEL.ROI_HEADS.SOFTMAXES = True
-    predictor = MonteCarloDropout(cfg, mcd_iterations, config['al_batch_size'])
+
+    if config['dropout_method'] == 'head':
+        predictor = MonteCarloDropoutHead(cfg, mcd_iterations)
+    else:
+        predictor = MonteCarloDropout(cfg, mcd_iterations, config['al_batch_size'])
+
     device = cfg.MODEL.DEVICE
 
     if len(pool_list) > 0:
@@ -411,7 +416,12 @@ def uncertainty_pooling(pool_list, pool_size, cfg, config, max_entropy, mcd_iter
 def certainty_pooling(pool_list, pool_size, cfg, config, max_entropy, mcd_iterations, mode):
     pool = {}
     cfg.MODEL.ROI_HEADS.SOFTMAXES = True
-    predictor = MonteCarloDropout(cfg, mcd_iterations, config['al_batch_size'])
+    
+    if config['dropout_method'] == 'head':
+        predictor = MonteCarloDropoutHead(cfg, mcd_iterations)
+    else:
+        predictor = MonteCarloDropout(cfg, mcd_iterations, config['al_batch_size'])
+        
     device = cfg.MODEL.DEVICE
 
     if len(pool_list) > 0:
