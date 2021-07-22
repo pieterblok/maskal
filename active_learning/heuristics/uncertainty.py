@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 15:06:20
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-02 15:41:37
+# @Last Modified time: 2021-07-22 10:47:12
 
 import numpy as np
 import torch
@@ -60,29 +60,21 @@ def uncertainty(observations, iterations, max_entropy, width, height, device, mo
         val_len = torch.tensor(len(val)).to(device)
         outputs_len = torch.tensor(iterations).to(device)
 
-        if mode == 'min':
-            u_sem = torch.clamp(torch.min(inv_entropies_norm), min=0, max=1)
-        elif mode == 'mean':
-            u_sem = torch.clamp(torch.mean(inv_entropies_norm), min=0, max=1)
-        elif mode == 'max':
-            u_sem = torch.clamp(torch.max(inv_entropies_norm), min=0, max=1)
-        else:
-            u_sem = torch.clamp(torch.mean(inv_entropies_norm), min=0, max=1)
-
+        u_sem = torch.clamp(torch.mean(inv_entropies_norm), min=0, max=1)
+        
         u_spl_m = torch.clamp(torch.divide(mask_IOUs.sum(), val_len), min=0, max=1)
         u_spl_b = torch.clamp(torch.divide(bbox_IOUs.sum(), val_len), min=0, max=1)
+        u_spl = torch.multiply(u_spl_m, u_spl_b)
+
+        u_sem_spl = torch.multiply(u_sem, u_spl)
         
         try:
             u_n = torch.clamp(torch.divide(val_len, outputs_len), min=0, max=1)
         except:
             u_n = 0.0
 
-        u_h_m = torch.multiply(u_sem, u_spl_m)
-        u_b_w = torch.multiply(u_spl_b, u_n)
-        u_h_m_w = torch.multiply(u_h_m, u_n)
-        u_h_m_b_w = torch.multiply(u_h_m, u_b_w)
-        
-        uncertainty_list.append(u_h_m_b_w.unsqueeze(0))
+        u_h = torch.multiply(u_sem_spl, u_n)
+        uncertainty_list.append(u_h.unsqueeze(0))
 
     if uncertainty_list:
         uncertainty_list = torch.cat(uncertainty_list)
