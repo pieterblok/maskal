@@ -8,7 +8,7 @@ resultsroot: "./results"
 dataroot: "./datasets/exp1/repeat_factor_training_sampler_3.0"
 traindir: "./datasets/train"
 valdir: "./datasets/val"
-testdir: "./datasets/test"
+testdir: "./datasets/test01"
 
 # training-parameters
 cuda_visible_devices: '0'
@@ -23,6 +23,7 @@ train_iterations_step_size: 2500
 step_image_number: 500
 step_ratios: [0.5, 0.8]
 eval_period: 500
+checkpoint_period: 500
 weight_decay: 0.0001
 learning_policy: 'steps_with_decay'
 gamma: 0.1

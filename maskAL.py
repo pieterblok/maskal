@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-07-12 13:43:19
+# @Last Modified time: 2021-07-22 10:54:24
 
 ## Active learning with Mask R-CNN
 
@@ -318,7 +318,12 @@ def Train_MaskRCNN(config, weightsfolder, gpu_num, iter, val_value, dropout_prob
     cfg.SOLVER.WARMUP_ITERS = config['warmup_iterations']
     cfg.SOLVER.MAX_ITER = max_iterations
     cfg.SOLVER.STEPS = steps
-    cfg.SOLVER.CHECKPOINT_PERIOD = (cfg.SOLVER.MAX_ITER+1)
+
+    if config['checkpoint_period'] == -1:
+        cfg.SOLVER.CHECKPOINT_PERIOD = (cfg.SOLVER.MAX_ITER+1)
+    else:
+        cfg.SOLVER.CHECKPOINT_PERIOD = config['checkpoint_period']
+
     cfg.TEST.EVAL_PERIOD = config['eval_period']
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = len(config['classes'])
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
