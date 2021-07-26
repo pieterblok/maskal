@@ -2,8 +2,8 @@
 # @Author: Pieter Blok
 # @Date:   2021-05-25 11:11:53
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-07-26 16:14:07
-## Image inference of Mask R-CNN with Monte-Carlo dropout
+# @Last Modified time: 2021-07-26 18:24:09
+## Determine the consistency of the uncertainty estimate as a function of the number of forward passes 
 
 ## general libraries
 import argparse
@@ -14,6 +14,7 @@ import sys
 import numpy as np
 import os
 import cv2
+import csv
 from PIL import Image
 import random
 import warnings
@@ -241,6 +242,10 @@ if __name__ == "__main__":
     check_direxcist(config['resultsfolder'])
     df = pd.DataFrame(columns=["number of forward passes", config['metric']])
 
+    with open(os.path.join(config['resultsfolder'], 'forward_passes_{:s}_prob{:.2f}.csv'.format(config['metric'], config['dropout_probability'])), 'w', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
+        csvwriter.writerow(['number of forward passes', 'total number of observations', 'mean', config['metric']])
+
     for it in range(len(config['forward_passes'])):
         uncertainties = {}
         iter = config['forward_passes'][it]
@@ -279,6 +284,25 @@ if __name__ == "__main__":
         cur_df = pd.DataFrame(data=data_tuples, columns=["number of forward passes", config['metric']])
         df = pd.concat([df, cur_df])
 
+    num_obs = df.groupby(["number of forward passes"]).size()
+    means = df.groupby(["number of forward passes"]).mean()
+    if config['metric'] == 'var':
+        variations = df.groupby(["number of forward passes"]).var()
+    elif config['metric'] == 'std':
+        variations = df.groupby(["number of forward passes"]).std()
+
+    with open(os.path.join(config['resultsfolder'], 'forward_passes_{:s}_prob{:.2f}.csv'.format(config['metric'], config['dropout_probability'])), 'a', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
+        num_obs = num_obs.to_list()
+        means = means.values 
+        variations = variations.values
+        for it in range(len(config['forward_passes'])):
+            iter = int(config['forward_passes'][it])
+            no = int(num_obs[it])
+            me = float(means[it])
+            va = float(variations[it])
+            csvwriter.writerow([iter, no, me, va])
+
     ax = sns.pointplot(x="number of forward passes", y=config['metric'], data=df, ci="sd", capsize=.1)
     
     plt.xlabel("Number of forward passes", fontsize=font_size)
@@ -288,4 +312,4 @@ if __name__ == "__main__":
         plt.ylabel("Standard deviation", fontsize=font_size)
         
     plt.tight_layout()
-    plt.savefig(os.path.join(config['resultsfolder'], 'forward_passes_{:s}.jpg'.format(config['metric'])))   
+    plt.savefig(os.path.join(config['resultsfolder'], 'forward_passes_{:s}_prob{:.2f}.jpg'.format(config['metric'], config['dropout_probability'])))   
