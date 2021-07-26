@@ -67,6 +67,12 @@ os.environ["CUDA_VISIBLE_DEVICES"]="0"
 supported_cv2_formats = (".bmp", ".dib", ".jpeg", ".jpg", ".jpe", ".jp2", ".png", ".pbm", ".pgm", ".ppm", ".sr", ".ras", ".tiff", ".tif")
 
 
+def check_direxcist(dir):
+    if dir is not None:
+        if not os.path.exists(dir):
+            os.makedirs(dir)  # make new folder
+
+
 def list_files(rootdir):
     images = []
 
@@ -184,6 +190,7 @@ def uncertainty(observations, iterations, max_entropy, width, height, device, mo
             
     else:
         uncertainty = torch.tensor([float('NaN')]).to(device)
+        uncertainty_list = torch.tensor([float('NaN')]).to(device)
 
     return uncertainty.detach().cpu().numpy().squeeze(0), uncertainty_list.detach().cpu().numpy().tolist()
 
@@ -231,6 +238,7 @@ if __name__ == "__main__":
     images = list_files(config['dataroot'])
     font_size = 15
 
+    check_direxcist(config['resultsfolder'])
     df = pd.DataFrame(columns=["number of forward passes", config['metric']])
 
     for it in range(len(config['forward_passes'])):
@@ -259,9 +267,9 @@ if __name__ == "__main__":
         for key, val in uncertainties.items():
             transposed = list(zip(*val))
             if config['metric'] == 'var':
-                vals = [np.var(values) for values in transposed]
+                vals = [np.nanvar(values) for values in transposed]
             elif config['metric'] == 'std':
-                vals = [np.std(values) for values in transposed]
+                vals = [np.nanstd(values) for values in transposed]
             all_vals.append(vals)
 
         all_vals = list(chain.from_iterable(all_vals))
