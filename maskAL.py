@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-07-22 10:54:24
+# @Last Modified time: 2021-07-26 10:54:59
 
 ## Active learning with Mask R-CNN
 
@@ -36,6 +36,7 @@ from detectron2.data.datasets import register_coco_instances
 from detectron2.engine import DefaultTrainer
 from detectron2.evaluation import COCOEvaluator, inference_on_dataset
 from detectron2.modeling import build_model
+from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.engine.hooks import HookBase
 import detectron2.utils.comm as comm
 
@@ -336,17 +337,16 @@ def Train_MaskRCNN(config, weightsfolder, gpu_num, iter, val_value, dropout_prob
     except: 
         val_value_output = val_value
 
-    return cfg, dataset_dicts_train, trainer, val_value_output
+    return cfg, dataset_dicts_train, val_value_output
 
 
-def Eval_MaskRCNN(cfg, config, dataset_dicts_train, trainer, weightsfolder, resultsfolder, csv_name, gpu_num, iter, init):      
+def Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder, csv_name, iter, init):      
     if init:
         register_coco_instances("test", {}, os.path.join(config['dataroot'], "test.json"), config['testdir'])
         test_metadata = MetadataCatalog.get("test")
         dataset_dicts_test = DatasetCatalog.get("test")
 
     cfg.OUTPUT_DIR = weightsfolder
-    trainer.resume_or_load(resume=True)
 
     try:
         cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "best_model_{:s}.pth".format(str(iter).zfill(3)))
@@ -356,10 +356,15 @@ def Eval_MaskRCNN(cfg, config, dataset_dicts_train, trainer, weightsfolder, resu
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = config['confidence_threshold']   # set the testing threshold for this model
     cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = config['nms_threshold']
     cfg.DATASETS.TEST = ("test",)
+
+    model = build_model(cfg)
+    checkpointer = DetectionCheckpointer(model)
+    checkpointer.load(cfg.MODEL.WEIGHTS)
+
     predictor = DefaultPredictor(cfg)
     evaluator = COCOEvaluator("test", ("bbox", "segm"), False, output_dir=resultsfolder)
     val_loader = build_detection_test_loader(cfg, "test")
-    eval_results = inference_on_dataset(trainer.model, val_loader, evaluator)
+    eval_results = inference_on_dataset(model, val_loader, evaluator)
     
     segm_strings = [c.replace(c, 'AP-' + c) for c in config['classes']]
 
@@ -505,15 +510,15 @@ if __name__ == "__main__":
             
         if config['duplicate_initial_model']:
             ## train Mask R-CNN on the initial-dataset and duplicate the results on the other strategies
-            cfg, dataset_dicts_train_init, trainer, val_value_init = Train_MaskRCNN(config, weightsfolders[0], gpu_num, 0, 0, config['dropout_probability'][0], init=True)
+            cfg, dataset_dicts_train_init, val_value_init = Train_MaskRCNN(config, weightsfolders[0], gpu_num, 0, 0, config['dropout_probability'][0], init=True)
 
             ## do the evaluation with the same initial-weight-files
             for e, (weightsfolder, resultsfolder, csv_name) in enumerate(zip(weightsfolders, resultsfolders, csv_names)):
                 if e == 0:
-                    cfg_init = Eval_MaskRCNN(cfg, config, dataset_dicts_train_init, trainer, weightsfolder, resultsfolder, csv_name, gpu_num, 0, init=True)
+                    cfg_init = Eval_MaskRCNN(cfg, config, dataset_dicts_train_init, weightsfolder, resultsfolder, csv_name, 0, init=True)
                 else:
                     copy_initial_weight_file(weightsfolders[0], weightsfolder, 0)
-                    cfg_init = Eval_MaskRCNN(cfg, config, dataset_dicts_train_init, trainer, weightsfolder, resultsfolder, csv_name, gpu_num, 0, init=False)
+                    cfg_init = Eval_MaskRCNN(cfg, config, dataset_dicts_train_init, weightsfolder, resultsfolder, csv_name, 0, init=False)
 
                 train_names = get_train_names(dataset_dicts_train_init, config['traindir'])
                 write_train_files(train_names, resultsfolder, 0)
@@ -530,13 +535,13 @@ if __name__ == "__main__":
             else:
                 ## train and evaluate Mask R-CNN on the initial dataset with different settings
                 if i == 0:
-                    cfg, dataset_dicts_train, trainer, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, 0, 0, dropout_probability, init=True)
-                    cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, trainer, weightsfolder, resultsfolder, csv_name, gpu_num, 0, init=True)
+                    cfg, dataset_dicts_train, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, 0, 0, dropout_probability, init=True)
+                    cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder, csv_name, 0, init=True)
                 else:
                     initial_train_names = get_initial_train_names(config)
                     update_train_dataset(config['dataroot'], config['traindir'], config['classes'], initial_train_names)
-                    cfg, dataset_dicts_train, trainer, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, 0, 0, dropout_probability, init=False)
-                    cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, trainer, weightsfolder, resultsfolder, csv_name, gpu_num, 0, init=False)
+                    cfg, dataset_dicts_train, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, 0, 0, dropout_probability, init=False)
+                    cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder, csv_name, 0, init=False)
                 train_names = get_train_names(dataset_dicts_train, config['traindir'])
                 write_train_files(train_names, resultsfolder, 0)
             
@@ -553,10 +558,10 @@ if __name__ == "__main__":
                     ## update the training list and retrain the algorithm
                     train_list = train_names + list(pool.keys())
                     update_train_dataset(config['dataroot'], config['traindir'], config['classes'], train_list)
-                    cfg, dataset_dicts_train, trainer, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, l+1, val_value, dropout_probability, init=False)
+                    cfg, dataset_dicts_train, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, l+1, val_value, dropout_probability, init=False)
 
                     ## evaluate and write the pooled image-names to a txt-file
-                    cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, trainer, weightsfolder, resultsfolder, csv_name, gpu_num, l+1, init=False)
+                    cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder, csv_name, l+1, init=False)
                     train_names = get_train_names(dataset_dicts_train, config['traindir'])
                     write_train_files(train_names, resultsfolder, l+1, pool)
                 else:
@@ -568,8 +573,8 @@ if __name__ == "__main__":
         ## train the complete train-pool to determine the base-line performance
         weightsfolder, resultsfolder, csv_name = init_folders_and_files(config)
         prepare_complete_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'])
-        cfg, dataset_dicts_train, trainer, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, 0, 0, 0.5, init=True)
-        cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, trainer, weightsfolder, resultsfolder, csv_name, gpu_num, 0, init=True)
+        cfg, dataset_dicts_train, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, 0, 0, 0.5, init=True)
+        cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder, csv_name, 0, init=True)
         train_names = get_train_names(dataset_dicts_train, config['traindir'])
         write_train_files(train_names, resultsfolder, 0)
 
