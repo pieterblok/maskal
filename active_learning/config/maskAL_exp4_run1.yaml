@@ -5,17 +5,17 @@
 # folders
 weightsroot: "./weights"
 resultsroot: "./results"
-dataroot: "./datasets/exp2/run3"
+dataroot: "./datasets/exp4/run1"
 traindir: "./datasets/train"
 valdir: "./datasets/val"
-testdir: "./datasets/test02"
+testdir: "./datasets/test04"
 
 # training-parameters
-cuda_visible_devices: '2'
+cuda_visible_devices: '0'
 classes: ['healthy', 'damaged', 'matured', 'cateye', 'headrot']
 transfer_learning_on_previous_models: True
 train_complete_trainset: False
-duplicate_initial_model: False
+duplicate_initial_model: True
 learning_rate: 0.01
 warmup_iterations: 500
 train_iterations_base: 2500
@@ -40,15 +40,15 @@ confidence_threshold: 0.5
 nms_threshold: 0.01
 
 # active-learning sampling
-experiment_name: 'exp2/run3'
-strategies: ['uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty']
-mode: ['mean', 'mean', 'mean', 'mean', 'mean', 'mean', 'mean', 'mean', 'mean', 'min', 'min', 'min', 'min', 'min', 'min', 'min', 'min', 'min']
+experiment_name: 'exp4/run1'
+strategies: ['uncertainty', 'random', 'certainty']
+mode: ['min', ' ', 'mean']
 initial_datasize: 100
 pool_size: 200
-loops: 12
-dropout_probability: [0.25, 0.50, 0.75, 0.25, 0.50, 0.75, 0.25, 0.50, 0.75, 0.25, 0.50, 0.75, 0.25, 0.50, 0.75, 0.25, 0.50, 0.75]
-mcd_iterations: [3, 3, 3, 6, 6, 6, 9, 9, 9, 3, 3, 3, 6, 6, 6, 9, 9, 9]
+loops: 5
+dropout_probability: 0.5
+mcd_iterations: 5
 dropout_method: 'head'
-al_batch_size: 3
+al_batch_size: 5
 iou_thres: 0.5
 resume: False
