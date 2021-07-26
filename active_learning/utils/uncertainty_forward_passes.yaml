@@ -1,0 +1,25 @@
+# Parameters to obtain the variance between the uncertainty metrics as a function of the number of forward passes
+# cd maskAL
+# python active_learning/utils/uncertainty_forward_passes.py --config active_learning/utils/uncertainty_forward_passes.yaml
+# explanation can be found here: https://git.wur.nl/blok012/maskAL
+
+# folders and files
+weightsfolder: "./weights/exp1/repeat_factor_training_sampler_1.5"
+weightsfile: "best_model_000.pth"
+resultsfolder: "./results/exp2"
+dataroot: "./datasets/test02"
+
+# inference-parameters
+classes: ['broccoli', 'damaged', 'matured', 'cateye', 'headrot']
+cuda_visible_devices: '0'
+score_thres: 0.5
+nms_thres: 0.01
+dropout_probability: 0.5
+
+# uncertainty-parameters
+forward_passes: [2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200]
+repetitions: 10
+al_batch_size: 5
+iou_thres: 0.5
+dropout_method: 'head'
+metric: 'std'
