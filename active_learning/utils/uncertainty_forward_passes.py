@@ -2,7 +2,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-05-25 11:11:53
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-07-26 18:24:09
+# @Last Modified time: 2021-07-27 09:41:47
 ## Determine the consistency of the uncertainty estimate as a function of the number of forward passes 
 
 ## general libraries
@@ -265,24 +265,24 @@ if __name__ == "__main__":
                 outputs = predictor(img)
                 obs = observations(outputs, config['iou_thres'])
                 img_uncertainty, uncertainty_obs = uncertainty(obs, iter, max_entropy, width, height, device, 'mean')
-                unc.append(uncertainty_obs)
+                unc.append(float(img_uncertainty))
             uncertainties[filename] = unc
 
         all_vals = []
         for key, val in uncertainties.items():
-            transposed = list(zip(*val))
             if config['metric'] == 'var':
-                vals = [np.nanvar(values) for values in transposed]
+                vals = np.nanvar(val)
             elif config['metric'] == 'std':
-                vals = [np.nanstd(values) for values in transposed]
+                vals = np.nanstd(val)
             all_vals.append(vals)
 
-        all_vals = list(chain.from_iterable(all_vals))
         current_iter = [iter for k in range(len(all_vals))]
         data_tuples = list(zip(current_iter, all_vals))
 
         cur_df = pd.DataFrame(data=data_tuples, columns=["number of forward passes", config['metric']])
         df = pd.concat([df, cur_df])
+
+    df.to_pickle(os.path.join(config['resultsfolder'], 'forward_passes_{:s}_prob{:.2f}.pkl'.format(config['metric'], config['dropout_probability'])))
 
     num_obs = df.groupby(["number of forward passes"]).size()
     means = df.groupby(["number of forward passes"]).mean()
