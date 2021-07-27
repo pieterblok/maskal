@@ -268,6 +268,9 @@ if __name__ == "__main__":
         print(key, ':', value)
 
 
+    os.environ["CUDA_VISIBLE_DEVICES"] = config['cuda_visible_devices']
+    gpu_num = len(config['cuda_visible_devices'])
+
     ## prepare the network for inference
     cfg = get_cfg()
     cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml"))
@@ -278,7 +281,7 @@ if __name__ == "__main__":
     cfg.MODEL.ROI_MASK_HEAD.NAME = "MaskRCNNConvUpsampleHeadDropout"
     cfg.MODEL.ROI_HEADS.SOFTMAXES = True
 
-    cfg.NUM_GPUS = 1
+    cfg.NUM_GPUS = gpu_num
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = len(config['classes'])
     cfg.OUTPUT_DIR = config['weightsfolder']
     cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, config['weightsfile'])
@@ -290,7 +293,6 @@ if __name__ == "__main__":
     checkpointer = DetectionCheckpointer(model)
     checkpointer.load(cfg.MODEL.WEIGHTS)
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = config['cuda_visible_devices']
     device = cfg.MODEL.DEVICE
     max_entropy = calculate_max_entropy(config['classes'])
     images = list_files(config['dataroot'])
