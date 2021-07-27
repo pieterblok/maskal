@@ -2,7 +2,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-05-25 11:11:53
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-07-27 09:41:47
+# @Last Modified time: 2021-07-27 11:44:13
 ## Determine the consistency of the uncertainty estimate as a function of the number of forward passes 
 
 ## general libraries
@@ -196,6 +196,62 @@ def uncertainty(observations, iterations, max_entropy, width, height, device, mo
     return uncertainty.detach().cpu().numpy().squeeze(0), uncertainty_list.detach().cpu().numpy().tolist()
 
 
+def mean_bbox_mask(obs):
+    mean_bboxs = []
+    mean_masks = []
+    for key, val in obs.items():
+        mean_bbox = torch.mean(torch.stack([v['pred_boxes'].tensor for v in val]), axis=0)
+        mean_mask = torch.mean(torch.stack([v['pred_masks'].flatten().type(torch.cuda.FloatTensor) for v in val]), axis=0)
+        mean_mask[mean_mask <= 0.3] = 0.0
+        mean_mask = mean_mask.reshape(-1, width, height)
+        mean_bboxs.append(mean_bbox)
+        mean_masks.append(mean_mask)
+    return mean_bboxs, mean_masks
+    
+
+def calculate_iou(mask_to_check, current_masks):
+    maskstransposed = mask_to_check.detach().cpu().numpy().transpose(1,2,0)
+    mask_to_check = maskstransposed.astype(np.uint8)
+
+    IoUs = []
+
+    for i in range (len(current_masks)):
+        current_mask = current_masks[i].detach().cpu().numpy().transpose(1,2,0)
+        current_mask = current_mask.astype(np.uint8)
+
+        try:
+            intersection_area = cv2.countNonZero(cv2.bitwise_and(mask_to_check, current_mask))
+            union_area = cv2.countNonZero(cv2.bitwise_or(mask_to_check, current_mask))
+
+            IoU = np.divide(intersection_area,union_area)
+            IoUs.append(IoU)
+        except:
+            IoUs.append(0.0)
+
+    return IoUs
+
+
+def cluster_observation(reps_ranked):
+    u_h = []
+    masks_to_check = []
+    for r in range(len(reps_ranked)):
+        if len(masks_to_check) == 0:
+            masks_to_check = reps_ranked[r][1]
+            u_h.append(reps_ranked[r][0])
+        else:
+            cur_u_h = np.empty(len(u_h[0]))
+            cur_u_h[:] = np.NaN
+            for mc in range(len(masks_to_check)):
+                mask_to_check = masks_to_check[mc]
+                current_masks = reps_ranked[r][1]
+                IoUs = calculate_iou(mask_to_check, current_masks)
+                match_id = np.argmax(IoUs)
+                cur_u_h[match_id] = reps_ranked[r][0][match_id]
+            u_h.append(cur_u_h.tolist())
+
+    return u_h
+                
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, default='./active_learning/utils/uncertainty_forward_passes.yaml', help='yaml with the tsne parameters')
@@ -234,7 +290,8 @@ if __name__ == "__main__":
     checkpointer = DetectionCheckpointer(model)
     checkpointer.load(cfg.MODEL.WEIGHTS)
 
-    device = cfg['MODEL']['DEVICE']
+    os.environ["CUDA_VISIBLE_DEVICES"] = config['cuda_visible_devices']
+    device = cfg.MODEL.DEVICE
     max_entropy = calculate_max_entropy(config['classes'])
     images = list_files(config['dataroot'])
     font_size = 15
@@ -242,13 +299,16 @@ if __name__ == "__main__":
     check_direxcist(config['resultsfolder'])
     df = pd.DataFrame(columns=["number of forward passes", config['metric']])
 
+
     with open(os.path.join(config['resultsfolder'], 'forward_passes_{:s}_prob{:.2f}.csv'.format(config['metric'], config['dropout_probability'])), 'w', newline='') as csvfile:
         csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
         csvwriter.writerow(['number of forward passes', 'total number of observations', 'mean', config['metric']])
 
+
     for it in range(len(config['forward_passes'])):
         uncertainties = {}
         iter = config['forward_passes'][it]
+        print("\n\r Number of forward passes: {:d}".format(iter))
 
         if config['dropout_method'] == 'head':
             predictor = MonteCarloDropoutHead(cfg, iter)
@@ -260,56 +320,71 @@ if __name__ == "__main__":
             img = cv2.imread(os.path.join(config['dataroot'], filename))
             width, height = img.shape[:-1]
             unc = []
+            reps = []
 
             for n in range(config['repetitions']):
                 outputs = predictor(img)
                 obs = observations(outputs, config['iou_thres'])
                 img_uncertainty, uncertainty_obs = uncertainty(obs, iter, max_entropy, width, height, device, 'mean')
-                unc.append(float(img_uncertainty))
-            uncertainties[filename] = unc
+                unc.append(uncertainty_obs)
+                mean_bboxs, mean_masks = mean_bbox_mask(obs)
+                reps.append([uncertainty_obs, mean_masks])
+
+            lengths = [len(reps[r][0]) for r in range(len(reps))]
+            ranked = np.argsort(lengths)
+            largest_obs = ranked[::-1]
+            reps_ranked = [reps[i] for i in largest_obs]
+            u_h = cluster_observation(reps_ranked)
+
+            if len(u_h) > 0:
+                uncertainties[filename] = u_h
 
         all_vals = []
         for key, val in uncertainties.items():
+            transposed = list(zip(*val))
             if config['metric'] == 'var':
-                vals = np.nanvar(val)
+                vals = [np.nanvar(values) for values in transposed]
             elif config['metric'] == 'std':
-                vals = np.nanstd(val)
+                vals = [np.nanstd(values) for values in transposed]
             all_vals.append(vals)
 
+        all_vals = list(chain.from_iterable(all_vals))
         current_iter = [iter for k in range(len(all_vals))]
         data_tuples = list(zip(current_iter, all_vals))
 
         cur_df = pd.DataFrame(data=data_tuples, columns=["number of forward passes", config['metric']])
         df = pd.concat([df, cur_df])
 
-    df.to_pickle(os.path.join(config['resultsfolder'], 'forward_passes_{:s}_prob{:.2f}.pkl'.format(config['metric'], config['dropout_probability'])))
 
-    num_obs = df.groupby(["number of forward passes"]).size()
-    means = df.groupby(["number of forward passes"]).mean()
-    if config['metric'] == 'var':
-        variations = df.groupby(["number of forward passes"]).var()
-    elif config['metric'] == 'std':
-        variations = df.groupby(["number of forward passes"]).std()
+    if not df.empty:
+        df.to_pickle(os.path.join(config['resultsfolder'], 'forward_passes_{:s}_prob{:.2f}.pkl'.format(config['metric'], config['dropout_probability'])))
 
-    with open(os.path.join(config['resultsfolder'], 'forward_passes_{:s}_prob{:.2f}.csv'.format(config['metric'], config['dropout_probability'])), 'a', newline='') as csvfile:
-        csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
-        num_obs = num_obs.to_list()
-        means = means.values 
-        variations = variations.values
-        for it in range(len(config['forward_passes'])):
-            iter = int(config['forward_passes'][it])
-            no = int(num_obs[it])
-            me = float(means[it])
-            va = float(variations[it])
-            csvwriter.writerow([iter, no, me, va])
+        num_obs = df.groupby(["number of forward passes"]).size()
+        means = df.groupby(["number of forward passes"]).mean()
+        if config['metric'] == 'var':
+            variations = df.groupby(["number of forward passes"]).var()
+        elif config['metric'] == 'std':
+            variations = df.groupby(["number of forward passes"]).std()
 
-    ax = sns.pointplot(x="number of forward passes", y=config['metric'], data=df, ci="sd", capsize=.1)
-    
-    plt.xlabel("Number of forward passes", fontsize=font_size)
-    if config['metric'] == 'var':
-        plt.ylabel("Variance", fontsize=font_size)
-    elif config['metric'] == 'std':
-        plt.ylabel("Standard deviation", fontsize=font_size)
+        with open(os.path.join(config['resultsfolder'], 'forward_passes_{:s}_prob{:.2f}.csv'.format(config['metric'], config['dropout_probability'])), 'a', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            num_obs = num_obs.to_list()
+            means = means.values 
+            variations = variations.values
+            for it in range(len(config['forward_passes'])):
+                iter = int(config['forward_passes'][it])
+                no = int(num_obs[it])
+                me = float(means[it])
+                va = float(variations[it])
+                csvwriter.writerow([iter, no, me, va])
+
+        ax = sns.pointplot(x="number of forward passes", y=config['metric'], data=df, ci="sd", capsize=.1)
         
-    plt.tight_layout()
-    plt.savefig(os.path.join(config['resultsfolder'], 'forward_passes_{:s}_prob{:.2f}.jpg'.format(config['metric'], config['dropout_probability'])))   
+        plt.xlabel("Number of forward passes", fontsize=font_size)
+        if config['metric'] == 'var':
+            plt.ylabel("Variance", fontsize=font_size)
+        elif config['metric'] == 'std':
+            plt.ylabel("Standard deviation", fontsize=font_size)
+            
+        plt.tight_layout()
+        plt.savefig(os.path.join(config['resultsfolder'], 'forward_passes_{:s}_prob{:.2f}.jpg'.format(config['metric'], config['dropout_probability'])))   
