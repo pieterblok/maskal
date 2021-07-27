@@ -2,7 +2,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-05-25 11:11:53
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-07-27 11:44:13
+# @Last Modified time: 2021-07-27 12:16:30
 ## Determine the consistency of the uncertainty estimate as a function of the number of forward passes 
 
 ## general libraries
@@ -245,8 +245,11 @@ def cluster_observation(reps_ranked):
                 mask_to_check = masks_to_check[mc]
                 current_masks = reps_ranked[r][1]
                 IoUs = calculate_iou(mask_to_check, current_masks)
-                match_id = np.argmax(IoUs)
-                cur_u_h[match_id] = reps_ranked[r][0][match_id]
+                try:
+                    match_id = np.argmax(IoUs)
+                    cur_u_h[match_id] = reps_ranked[r][0][match_id]
+                except:
+                    pass
             u_h.append(cur_u_h.tolist())
 
     return u_h
