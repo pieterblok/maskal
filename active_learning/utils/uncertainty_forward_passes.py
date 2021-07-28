@@ -2,7 +2,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-05-25 11:11:53
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-07-28 09:52:29
+# @Last Modified time: 2021-07-28 19:27:35
 ## Determine the consistency of the uncertainty estimate as a function of the number of forward passes 
 
 ## general libraries
@@ -108,6 +108,8 @@ def calculate_max_entropy(classes):
 ## this is a copy-paste of the uncertainty function of uncertainty.py, but with one more outputs for u_h of the observations
 def uncertainty(observations, iterations, max_entropy, width, height, device, mode = 'min'):
     uncertainty_list = []
+    mean_bboxs = []
+    mean_masks = []
     
     for key, val in observations.items():
         softmaxes = [v['softmaxes'] for v in val]
@@ -121,8 +123,11 @@ def uncertainty(observations, iterations, max_entropy, width, height, device, mo
 
         mean_bbox = torch.mean(torch.stack([v['pred_boxes'].tensor for v in val]), axis=0)
         mean_mask = torch.mean(torch.stack([v['pred_masks'].flatten().type(torch.cuda.FloatTensor) for v in val]), axis=0)
-        mean_mask[mean_mask <= 0.3] = 0.0
+        mean_mask[mean_mask < 0.25] = 0.0
         mean_mask = mean_mask.reshape(-1, width, height)
+
+        mean_bboxs.append(mean_bbox)
+        mean_masks.append(mean_mask)
 
         mask_IOUs = []
         for v in val:
@@ -155,7 +160,7 @@ def uncertainty(observations, iterations, max_entropy, width, height, device, mo
         if len(bbox_IOUs) > 0:
             bbox_IOUs = torch.cat(bbox_IOUs)
         else:
-            bbox_IOUs = torch.tensor([float('NaN')]).to(device)
+            bbox_IOUs = torch.tensor([float('NaN')]).to(device)        
 
         val_len = torch.tensor(len(val)).to(device)
         outputs_len = torch.tensor(iterations).to(device)
@@ -192,30 +197,19 @@ def uncertainty(observations, iterations, max_entropy, width, height, device, mo
         uncertainty = torch.tensor([float('NaN')]).to(device)
         uncertainty_list = torch.tensor([float('NaN')]).to(device)
 
-    return uncertainty.detach().cpu().numpy().squeeze(0), uncertainty_list.detach().cpu().numpy().tolist()
-
-
-def mean_bbox_mask(obs):
-    mean_bboxs = []
-    mean_masks = []
-    for key, val in obs.items():
-        mean_bbox = torch.mean(torch.stack([v['pred_boxes'].tensor for v in val]), axis=0)
-        mean_mask = torch.mean(torch.stack([v['pred_masks'].flatten().type(torch.cuda.FloatTensor) for v in val]), axis=0)
-        mean_mask[mean_mask <= 0.3] = 0.0
-        mean_mask = mean_mask.reshape(-1, width, height)
-        mean_bboxs.append(mean_bbox)
-        mean_masks.append(mean_mask)
-    return mean_bboxs, mean_masks
+    return uncertainty.detach().cpu().numpy().squeeze(0), uncertainty_list.detach().cpu().numpy().tolist(), mean_bboxs, mean_masks
     
 
 def calculate_iou(mask_to_check, current_masks):
     maskstransposed = mask_to_check.detach().cpu().numpy().transpose(1,2,0)
+    maskstransposed[maskstransposed > 0] = 1
     mask_to_check = maskstransposed.astype(np.uint8)
 
     IoUs = []
 
     for i in range (len(current_masks)):
         current_mask = current_masks[i].detach().cpu().numpy().transpose(1,2,0)
+        current_mask[current_mask > 0] = 1
         current_mask = current_mask.astype(np.uint8)
 
         try:
@@ -223,7 +217,10 @@ def calculate_iou(mask_to_check, current_masks):
             union_area = cv2.countNonZero(cv2.bitwise_or(mask_to_check, current_mask))
 
             IoU = np.divide(intersection_area,union_area)
-            IoUs.append(IoU)
+            if not np.isnan(IoU):
+                IoUs.append(IoU)
+            else:
+                IoUs.append(0.0)
         except:
             IoUs.append(0.0)
 
@@ -232,11 +229,13 @@ def calculate_iou(mask_to_check, current_masks):
 
 def cluster_observation(reps_ranked):
     u_h = []
+    fps = []
     masks_to_check = []
     for r in range(len(reps_ranked)):
         if len(masks_to_check) == 0:
             masks_to_check = reps_ranked[r][1]
             u_h.append(reps_ranked[r][0])
+            fps.append(reps_ranked[r][2])
         else:
             cur_u_h = np.empty(len(u_h[0]))
             cur_u_h[:] = np.NaN
@@ -244,14 +243,89 @@ def cluster_observation(reps_ranked):
                 mask_to_check = masks_to_check[mc]
                 current_masks = reps_ranked[r][1]
                 IoUs = calculate_iou(mask_to_check, current_masks)
-                try:
-                    match_id = np.argmax(IoUs)
-                    cur_u_h[match_id] = reps_ranked[r][0][match_id]
-                except:
-                    pass
+                if not all(IoU == 0 for IoU in IoUs):
+                    try:
+                        match_id = np.argmax(IoUs)
+                        cur_u_h[mc] = reps_ranked[r][0][match_id]
+                    except:
+                        pass
             u_h.append(cur_u_h.tolist())
+            fps.append(reps_ranked[r][2])
 
-    return u_h
+    return u_h, fps
+
+
+def visualize_obs(img, mean_bboxs, mean_masks, u_total):
+    width, height = img.shape[:-1]
+    img_vis = img.copy()
+    
+    font_face = cv2.FONT_HERSHEY_DUPLEX
+    font_scale = 1.25
+    font_thickness = 1
+    thickness = 3
+    text_color = [0, 0, 0]
+    text_boxes_color = [255, 255, 255]
+    obs_color = [255, 255, 255]
+    
+    if len(mean_masks) > 0:
+        red_mask = np.zeros((width, height),dtype=np.uint8)
+        blue_mask = np.zeros((width, height),dtype=np.uint8)
+        green_mask = np.zeros((width, height),dtype=np.uint8)
+        all_masks = np.zeros((width, height,3),dtype=np.uint8)
+
+        for i in range(len(mean_masks)):
+            mean_bbox = mean_bboxs[i]
+            boxes = mean_bbox.detach().cpu().numpy()
+            
+            mean_mask = mean_masks[i]
+            maskstransposed = mean_mask.detach().cpu().numpy().transpose(1,2,0)
+            maskstransposed[maskstransposed > 0] = 1
+            mask = maskstransposed.astype(np.uint8)
+
+            x1, y1, x2, y2 = boxes[0]
+            cv2.rectangle(img_vis, (int(x1), int(y1)), (int(x2), int(y2)), obs_color, thickness)
+
+            text_str = "Observation {:d}".format(i+1)
+            text_w, text_h = cv2.getTextSize(text_str, font_face, font_scale, font_thickness)[0]
+            text_pt = (x1, y1 - 3)
+
+            cv2.rectangle(img_vis, (int(x1), int(y1)), (int(x1) + int(text_w), int(y1) - int(text_h) - 4), obs_color, -1)
+            cv2.putText(img_vis, text_str, (int(text_pt[0]), int(text_pt[1])), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
+
+            blue_mask = cv2.add(blue_mask,mask)
+            green_mask = cv2.add(green_mask,mask)
+            red_mask = cv2.add(red_mask,mask)
+
+        all_masks[:,:,0] = blue_mask
+        all_masks[:,:,1] = green_mask
+        all_masks[:,:,2] = red_mask
+        all_masks = np.multiply(all_masks, obs_color[0]).astype(np.uint8)
+
+        strs = ['u_h']
+        for j, (u_h) in enumerate(zip(u_total)):
+            mean_bbox = mean_bboxs[j]
+            boxes = mean_bbox.detach().cpu().numpy()
+            x1, y1, x2, y2 = boxes[0]
+
+            values = []
+            values.append([u_h])
+
+            for v in range(len(values[0])):
+                val = values[0][v]
+                text_str = strs[v] + ": {:.2f}".format(val[0])
+
+                text_w, text_h = cv2.getTextSize(text_str, font_face, font_scale, font_thickness)[0]
+                text_pt = (x2 + 5, y1 + (38 * (v+1))+10)
+
+                cv2.rectangle(img_vis, (int(text_pt[0]), int(text_pt[1]) + 7), (int(text_pt[0]) + int(text_w), int(text_pt[1]) - int(text_h) - 4), text_boxes_color, -1)
+                cv2.putText(img_vis, text_str, (int(text_pt[0]), int(text_pt[1])), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
+
+        img_obs = cv2.addWeighted(img_vis, 1, all_masks, 0.5, 0)
+
+    else:
+        img_obs = img_vis
+
+    return img_obs
                 
 
 if __name__ == "__main__":
@@ -298,41 +372,47 @@ if __name__ == "__main__":
     max_entropy = calculate_max_entropy(config['classes'])
     images = list_files(config['dataroot'])
     check_direxcist(config['resultsfolder'])
+    
+    uncertainties = {}
 
-    for it in range(len(config['forward_passes'])):
-        uncertainties = {}
-        iter = config['forward_passes'][it]
-        print("\n\r Number of forward passes: {:d}".format(iter))
+    for i in tqdm(range(len(images))):
+        filename = images[i]
+        img = cv2.imread(os.path.join(config['dataroot'], filename))
+        width, height = img.shape[:-1]
+        fps = []
 
-        if config['dropout_method'] == 'head':
-            predictor = MonteCarloDropoutHead(cfg, iter)
-        else:
-            predictor = MonteCarloDropout(cfg, iter, config['al_batch_size'])
+        for it in range(len(config['forward_passes'])):
+            iter = config['forward_passes'][it]
 
-        for i in tqdm(range(len(images))):
-            filename = images[i]
-            img = cv2.imread(os.path.join(config['dataroot'], filename))
-            width, height = img.shape[:-1]
-            unc = []
-            reps = []
+            if config['dropout_method'] == 'head':
+                predictor = MonteCarloDropoutHead(cfg, iter)
+            else:
+                predictor = MonteCarloDropout(cfg, iter, config['al_batch_size'])
 
-            for n in range(config['repetitions']):
-                outputs = predictor(img)
-                obs = observations(outputs, config['iou_thres'])
-                img_uncertainty, uncertainty_obs = uncertainty(obs, iter, max_entropy, width, height, device, 'mean')
-                unc.append(uncertainty_obs)
-                mean_bboxs, mean_masks = mean_bbox_mask(obs)
-                reps.append([uncertainty_obs, mean_masks])
+            outputs = predictor(img)
+            obs = observations(outputs, config['iou_thres'])
+            img_uncertainty, uncertainty_obs, mean_bboxs, mean_masks = uncertainty(obs, iter, max_entropy, width, height, device, 'mean')
+            fps.append([uncertainty_obs, mean_masks, iter])
 
-            lengths = [len(reps[r][0]) for r in range(len(reps))]
-            ranked = np.argsort(lengths)
-            largest_obs = ranked[::-1]
-            reps_ranked = [reps[i] for i in largest_obs]
-            u_h = cluster_observation(reps_ranked)
+            if config['visualize']:
+                img_obs = visualize_obs(img, mean_bboxs, mean_masks, uncertainty_obs)
+                img_obs = cv2.cvtColor(img_obs, cv2.COLOR_BGR2RGB)
+                img_obs = Image.fromarray(img_obs)
+                img_obs.save(os.path.join(config['resultsfolder'], '{:s}_fp_{:03d}_prob{:.2f}.jpg'.format(os.path.splitext(filename)[0], iter, config['dropout_probability'])), "JPEG")
+                # imshow_pil(img_obs)
 
-            if len(u_h) > 0:
-                uncertainties[filename] = u_h
+        lengths = [len(fps[r][0]) for r in range(len(fps))]
+        ranked = np.argsort(lengths)
+        largest_obs = ranked[::-1]
+        reps_ranked = [fps[i] for i in largest_obs]
+        u_h, fwps = cluster_observation(reps_ranked)
 
-        pickle_name = os.path.join(config['resultsfolder'], 'forward_passes_{:03d}_prob{:.2f}.pkl'.format(iter, config['dropout_probability']))
+        if len(u_h) > 0:
+            zipped_lists = zip(fwps, u_h)
+            sorted_zipped_lists = sorted(zipped_lists)
+            u_h_f = [element for _, element in sorted_zipped_lists]
+            uncertainties[filename] = u_h_f
+
+        pickle_name = os.path.join(config['resultsfolder'], 'uncertainty_metrics_prob_{:.2f}.pkl'.format(config['dropout_probability']))
         with open(pickle_name, 'wb') as handle:
             pickle.dump(uncertainties, handle, protocol=pickle.HIGHEST_PROTOCOL)
