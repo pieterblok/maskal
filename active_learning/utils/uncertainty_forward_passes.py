@@ -2,7 +2,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-05-25 11:11:53
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-07-27 12:16:30
+# @Last Modified time: 2021-07-28 09:52:29
 ## Determine the consistency of the uncertainty estimate as a function of the number of forward passes 
 
 ## general libraries
@@ -14,13 +14,12 @@ import sys
 import numpy as np
 import os
 import cv2
-import csv
+import pickle
 from PIL import Image
 import random
 import warnings
 import operator
 from collections import OrderedDict
-from itertools import chain
 from tqdm import tqdm
 import seaborn as sns
 import pandas as pd
@@ -270,7 +269,6 @@ if __name__ == "__main__":
     for key, value in config.items():
         print(key, ':', value)
 
-
     os.environ["CUDA_VISIBLE_DEVICES"] = config['cuda_visible_devices']
     gpu_num = len(config['cuda_visible_devices'])
 
@@ -299,16 +297,7 @@ if __name__ == "__main__":
     device = cfg.MODEL.DEVICE
     max_entropy = calculate_max_entropy(config['classes'])
     images = list_files(config['dataroot'])
-    font_size = 15
-
     check_direxcist(config['resultsfolder'])
-    df = pd.DataFrame(columns=["number of forward passes", config['metric']])
-
-
-    with open(os.path.join(config['resultsfolder'], 'forward_passes_{:s}_prob{:.2f}.csv'.format(config['metric'], config['dropout_probability'])), 'w', newline='') as csvfile:
-        csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
-        csvwriter.writerow(['number of forward passes', 'total number of observations', 'mean', config['metric']])
-
 
     for it in range(len(config['forward_passes'])):
         uncertainties = {}
@@ -344,52 +333,6 @@ if __name__ == "__main__":
             if len(u_h) > 0:
                 uncertainties[filename] = u_h
 
-        all_vals = []
-        for key, val in uncertainties.items():
-            transposed = list(zip(*val))
-            if config['metric'] == 'var':
-                vals = [np.nanvar(values) for values in transposed]
-            elif config['metric'] == 'std':
-                vals = [np.nanstd(values) for values in transposed]
-            all_vals.append(vals)
-
-        all_vals = list(chain.from_iterable(all_vals))
-        current_iter = [iter for k in range(len(all_vals))]
-        data_tuples = list(zip(current_iter, all_vals))
-
-        cur_df = pd.DataFrame(data=data_tuples, columns=["number of forward passes", config['metric']])
-        df = pd.concat([df, cur_df])
-
-
-    if not df.empty:
-        df.to_pickle(os.path.join(config['resultsfolder'], 'forward_passes_{:s}_prob{:.2f}.pkl'.format(config['metric'], config['dropout_probability'])))
-
-        num_obs = df.groupby(["number of forward passes"]).size()
-        means = df.groupby(["number of forward passes"]).mean()
-        if config['metric'] == 'var':
-            variations = df.groupby(["number of forward passes"]).var()
-        elif config['metric'] == 'std':
-            variations = df.groupby(["number of forward passes"]).std()
-
-        with open(os.path.join(config['resultsfolder'], 'forward_passes_{:s}_prob{:.2f}.csv'.format(config['metric'], config['dropout_probability'])), 'a', newline='') as csvfile:
-            csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            num_obs = num_obs.to_list()
-            means = means.values 
-            variations = variations.values
-            for it in range(len(config['forward_passes'])):
-                iter = int(config['forward_passes'][it])
-                no = int(num_obs[it])
-                me = float(means[it])
-                va = float(variations[it])
-                csvwriter.writerow([iter, no, me, va])
-
-        ax = sns.pointplot(x="number of forward passes", y=config['metric'], data=df, ci="sd", capsize=.1)
-        
-        plt.xlabel("Number of forward passes", fontsize=font_size)
-        if config['metric'] == 'var':
-            plt.ylabel("Variance", fontsize=font_size)
-        elif config['metric'] == 'std':
-            plt.ylabel("Standard deviation", fontsize=font_size)
-            
-        plt.tight_layout()
-        plt.savefig(os.path.join(config['resultsfolder'], 'forward_passes_{:s}_prob{:.2f}.jpg'.format(config['metric'], config['dropout_probability'])))   
+        pickle_name = os.path.join(config['resultsfolder'], 'forward_passes_{:03d}_prob{:.2f}.pkl'.format(iter, config['dropout_probability']))
+        with open(pickle_name, 'wb') as handle:
+            pickle.dump(uncertainties, handle, protocol=pickle.HIGHEST_PROTOCOL)
