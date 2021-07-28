@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 15:06:20
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-07-22 10:47:12
+# @Last Modified time: 2021-07-28 16:24:32
 
 import numpy as np
 import torch
@@ -21,7 +21,7 @@ def uncertainty(observations, iterations, max_entropy, width, height, device, mo
 
         mean_bbox = torch.mean(torch.stack([v['pred_boxes'].tensor for v in val]), axis=0)
         mean_mask = torch.mean(torch.stack([v['pred_masks'].flatten().type(torch.cuda.FloatTensor) for v in val]), axis=0)
-        mean_mask[mean_mask <= 0.3] = 0.0
+        mean_mask[mean_mask < 0.25] = 0.0
         mean_mask = mean_mask.reshape(-1, width, height)
 
         mask_IOUs = []
