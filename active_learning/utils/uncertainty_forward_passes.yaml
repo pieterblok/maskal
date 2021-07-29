@@ -5,7 +5,7 @@
 
 # folders and files
 weightsfolder: "./weights/exp1/repeat_factor_training_sampler_1.5"
-weightsfile: "model_0034999.pth"
+weightsfile: "model_0017499.pth"
 resultsfolder: "./results/exp2/prob_0.50"
 dataroot: "./datasets/test02"
 
