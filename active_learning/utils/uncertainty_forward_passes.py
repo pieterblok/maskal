@@ -2,7 +2,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-05-25 11:11:53
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-07-28 19:27:35
+# @Last Modified time: 2021-07-29 11:00:44
 ## Determine the consistency of the uncertainty estimate as a function of the number of forward passes 
 
 ## general libraries
@@ -126,8 +126,13 @@ def uncertainty(observations, iterations, max_entropy, width, height, device, mo
         mean_mask[mean_mask < 0.25] = 0.0
         mean_mask = mean_mask.reshape(-1, width, height)
 
-        mean_bboxs.append(mean_bbox)
-        mean_masks.append(mean_mask)
+        mean_bbox_np = mean_bbox.detach().cpu().numpy()
+        mean_mask_np = mean_mask.detach().cpu().numpy()
+        mean_mask_np[mean_mask_np > 0] = 1
+        mean_mask_np = mean_mask_np.astype(np.bool)
+        # mean_mask_np_vis = np.multiply(mean_mask_np, 255).transpose(1,2,0)
+        mean_bboxs.append(mean_bbox_np)
+        mean_masks.append(mean_mask_np)
 
         mask_IOUs = []
         for v in val:
@@ -201,15 +206,13 @@ def uncertainty(observations, iterations, max_entropy, width, height, device, mo
     
 
 def calculate_iou(mask_to_check, current_masks):
-    maskstransposed = mask_to_check.detach().cpu().numpy().transpose(1,2,0)
-    maskstransposed[maskstransposed > 0] = 1
+    maskstransposed = mask_to_check.transpose(1,2,0)
     mask_to_check = maskstransposed.astype(np.uint8)
 
     IoUs = []
 
     for i in range (len(current_masks)):
-        current_mask = current_masks[i].detach().cpu().numpy().transpose(1,2,0)
-        current_mask[current_mask > 0] = 1
+        current_mask = current_masks[i].transpose(1,2,0)
         current_mask = current_mask.astype(np.uint8)
 
         try:
@@ -274,12 +277,10 @@ def visualize_obs(img, mean_bboxs, mean_masks, u_total):
         all_masks = np.zeros((width, height,3),dtype=np.uint8)
 
         for i in range(len(mean_masks)):
-            mean_bbox = mean_bboxs[i]
-            boxes = mean_bbox.detach().cpu().numpy()
+            boxes = mean_bboxs[i]
             
             mean_mask = mean_masks[i]
-            maskstransposed = mean_mask.detach().cpu().numpy().transpose(1,2,0)
-            maskstransposed[maskstransposed > 0] = 1
+            maskstransposed = mean_mask.transpose(1,2,0)
             mask = maskstransposed.astype(np.uint8)
 
             x1, y1, x2, y2 = boxes[0]
@@ -303,8 +304,7 @@ def visualize_obs(img, mean_bboxs, mean_masks, u_total):
 
         strs = ['u_h']
         for j, (u_h) in enumerate(zip(u_total)):
-            mean_bbox = mean_bboxs[j]
-            boxes = mean_bbox.detach().cpu().numpy()
+            boxes = mean_bboxs[j]
             x1, y1, x2, y2 = boxes[0]
 
             values = []
