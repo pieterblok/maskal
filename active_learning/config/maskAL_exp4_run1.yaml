@@ -45,9 +45,9 @@ strategies: ['uncertainty', 'random', 'certainty']
 mode: ['min', ' ', 'mean']
 initial_datasize: 100
 pool_size: 200
-loops: 5
+loops: 12
 dropout_probability: 0.5
-mcd_iterations: 5
+mcd_iterations: 20
 dropout_method: 'head'
 al_batch_size: 5
 iou_thres: 0.5

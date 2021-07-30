@@ -41,14 +41,14 @@ nms_threshold: 0.01
 
 # active-learning sampling
 experiment_name: 'exp3/run1'
-strategies: ['uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty']
-mode: ['min', 'min', 'min', 'min', 'min']
+strategies: 'uncertainty'
+mode: 'min'
 initial_datasize: 100
 pool_size: [100, 200, 400, 600, 800]
 loops: [24, 12, 6, 4, 3]
 dropout_probability: 0.5
-mcd_iterations: 5
+mcd_iterations: 20
 dropout_method: 'head'
-al_batch_size: 5
+al_batch_size: 1
 iou_thres: 0.5
 resume: False

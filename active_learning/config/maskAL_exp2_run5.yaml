@@ -41,14 +41,14 @@ nms_threshold: 0.01
 
 # active-learning sampling
 experiment_name: 'exp2/run5'
-strategies: ['uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty', 'uncertainty']
-mode: ['mean', 'mean', 'mean', 'mean', 'mean', 'mean', 'mean', 'mean', 'mean', 'min', 'min', 'min', 'min', 'min', 'min', 'min', 'min', 'min']
+strategies: 'uncertainty'
+mode: ['mean', 'mean', 'min', 'min', 'mean', 'mean', 'min', 'min', 'mean', 'mean', 'min', 'min']
 initial_datasize: 100
 pool_size: 200
 loops: 12
-dropout_probability: [0.25, 0.50, 0.75, 0.25, 0.50, 0.75, 0.25, 0.50, 0.75, 0.25, 0.50, 0.75, 0.25, 0.50, 0.75, 0.25, 0.50, 0.75]
-mcd_iterations: [3, 3, 3, 6, 6, 6, 9, 9, 9, 3, 3, 3, 6, 6, 6, 9, 9, 9]
+dropout_probability: [0.25, 0.25, 0.25, 0.25, 0.50, 0.50, 0.50, 0.50, 0.75, 0.75, 0.75, 0.75]
+mcd_iterations: [20, 40, 20, 40, 20, 40, 20, 40, 20, 40, 20, 40]
 dropout_method: 'head'
-al_batch_size: 3
+al_batch_size: 1
 iou_thres: 0.5
 resume: False
