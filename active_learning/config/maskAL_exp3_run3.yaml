@@ -5,13 +5,13 @@
 # folders
 weightsroot: "./weights"
 resultsroot: "./results"
-dataroot: "./datasets/exp3/run1"
+dataroot: "./datasets/exp3/run3"
 traindir: "./datasets/train"
 valdir: "./datasets/val"
 testdir: "./datasets/test03"
 
 # training-parameters
-cuda_visible_devices: '0'
+cuda_visible_devices: '2'
 classes: ['healthy', 'damaged', 'matured', 'cateye', 'headrot']
 transfer_learning_on_previous_models: True
 train_complete_trainset: False
@@ -40,7 +40,7 @@ confidence_threshold: 0.5
 nms_threshold: 0.01
 
 # active-learning sampling
-experiment_name: 'exp3/run1'
+experiment_name: 'exp3/run3'
 strategies: 'uncertainty'
 mode: 'mean'
 initial_datasize: 100
