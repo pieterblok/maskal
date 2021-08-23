@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-07-26 10:54:59
+# @Last Modified time: 2021-08-23 13:12:26
 
 ## Active learning with Mask R-CNN
 
@@ -526,7 +526,7 @@ if __name__ == "__main__":
         max_entropy = calculate_max_entropy(config['classes'])
 
         ## active-learning strategies
-        for i, (strategy, pool_size, mcd_iterations, mode, dropout_probability, weightsfolder, resultsfolder, csv_name) in enumerate(zip(config['strategies'], config['pool_size'], config['mcd_iterations'], config['mode'], config['dropout_probability'], weightsfolders, resultsfolders, csv_names)):
+        for i, (strategy, pool_size, mcd_iterations, mode, dropout_probability, loops, weightsfolder, resultsfolder, csv_name) in enumerate(zip(config['strategies'], config['pool_size'], config['mcd_iterations'], config['mode'], config['dropout_probability'], config['loops'], weightsfolders, resultsfolders, csv_names)):
             if config['duplicate_initial_model']:
                 ## load the initial_cfg to obtain the model-weights and image-names of the initial training
                 cfg = cfg_init 
@@ -547,7 +547,7 @@ if __name__ == "__main__":
             
             
             ## do the iterative pooling
-            for l in range(config['loops']):
+            for l in range(loops):
                 copy_previous_weights(weightsfolder, l+1)
                 pool_list = create_pool_list(config, train_names)
 
