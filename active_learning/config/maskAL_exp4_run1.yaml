@@ -45,6 +45,7 @@ strategies: ['uncertainty', 'random', 'certainty']
 mode: ['min', ' ', 'mean']
 initial_datasize: 100
 pool_size: 200
+equal_pool_size: True
 loops: 12
 dropout_probability: 0.5
 mcd_iterations: 20

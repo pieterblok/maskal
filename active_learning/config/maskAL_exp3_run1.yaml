@@ -44,8 +44,9 @@ experiment_name: 'exp3/run1'
 strategies: 'uncertainty'
 mode: 'mean'
 initial_datasize: 100
-pool_size: [100, 200, 400, 600, 800]
-loops: [24, 12, 6, 4, 3]
+pool_size: [50, 100, 200, 400, [50, 100, 200], [100, 200, 400], [200, 400]]
+equal_pool_size: [True, True, True, True, False, False, False]
+loops: [48, 24, 12, 6, [8, 4, 8], [4, 2, 4], [4, 4]]
 dropout_probability: 0.25
 mcd_iterations: 20
 dropout_method: 'head'
