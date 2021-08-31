@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-08-23 13:12:26
+# @Last Modified time: 2021-08-31 16:00:25
 
 ## Active learning with Mask R-CNN
 
@@ -18,6 +18,7 @@ import random
 import operator
 import logging
 from shutil import copyfile
+from itertools import chain
 from collections import OrderedDict, Counter
 from tqdm import tqdm
 import warnings
@@ -70,9 +71,16 @@ file_handler.setFormatter(formatter)
 def process_config_file(config, ints_to_lists):
     lengths = []
 
+    nest = False
+    if not config['equal_pool_size']:
+        nest = True
+
     for il in range(len(ints_to_lists)):
         int_to_list = ints_to_lists[il]
-        config[int_to_list] = (config[int_to_list] if type(config[int_to_list]) is list else [config[int_to_list]])
+        if nest:
+            config[int_to_list] = [config[int_to_list]]
+        else:
+            config[int_to_list] = (config[int_to_list] if type(config[int_to_list]) is list else [config[int_to_list]])                
         lengths.append(len(config[int_to_list])) 
     max_length = max(lengths)
 
@@ -98,9 +106,13 @@ def init_folders_and_files(config):
         counts = Counter(config['strategies'])
         counts = list(counts.values())
         duplicates = any(x > 1 for x in counts)
-
+        hybrid_count = 0
+            
         for s, (strategy, mode, dropout_probability, mcd_iterations, pool_size) in enumerate(zip(config['strategies'], config['mode'], config['dropout_probability'], config['mcd_iterations'], config['pool_size'])):
             if duplicates:
+                if isinstance(pool_size, list):
+                    hybrid_count += 1
+                    pool_size = "hybrid{:02d}".format(hybrid_count)
                 folder_name = strategy + "_" + mode + "_" + "{:.2f}".format(dropout_probability) + "_" + str(mcd_iterations) + "_" + str(pool_size)
             else:
                 folder_name = strategy
@@ -494,7 +506,7 @@ if __name__ == "__main__":
     for key, value in config.items():
         print(key, ':', value)
 
-    config = process_config_file(config, ['strategies', 'mode', 'pool_size', 'dropout_probability', 'mcd_iterations'])
+    config = process_config_file(config, ['strategies', 'mode', 'equal_pool_size', 'pool_size', 'dropout_probability', 'mcd_iterations', 'loops'])
     os.environ["CUDA_VISIBLE_DEVICES"] = config['cuda_visible_devices']
     gpu_num = len(config['cuda_visible_devices'])
     check_direxcist(config['dataroot'])
@@ -526,7 +538,7 @@ if __name__ == "__main__":
         max_entropy = calculate_max_entropy(config['classes'])
 
         ## active-learning strategies
-        for i, (strategy, pool_size, mcd_iterations, mode, dropout_probability, loops, weightsfolder, resultsfolder, csv_name) in enumerate(zip(config['strategies'], config['pool_size'], config['mcd_iterations'], config['mode'], config['dropout_probability'], config['loops'], weightsfolders, resultsfolders, csv_names)):
+        for i, (strategy, equal_pool_size, pool_size, mcd_iterations, mode, dropout_probability, loops, weightsfolder, resultsfolder, csv_name) in enumerate(zip(config['strategies'], config['equal_pool_size'], config['pool_size'], config['mcd_iterations'], config['mode'], config['dropout_probability'], config['loops'], weightsfolders, resultsfolders, csv_names)):
             if config['duplicate_initial_model']:
                 ## load the initial_cfg to obtain the model-weights and image-names of the initial training
                 cfg = cfg_init 
@@ -545,11 +557,17 @@ if __name__ == "__main__":
                 train_names = get_train_names(dataset_dicts_train, config['traindir'])
                 write_train_files(train_names, resultsfolder, 0)
             
+            if not equal_pool_size:
+                pool_size_list = list(chain.from_iterable([[pool_size[ll]] * loops[ll] for ll in range(len(loops))]))
+                loops = sum(loops)
             
             ## do the iterative pooling
             for l in range(loops):
                 copy_previous_weights(weightsfolder, l+1)
                 pool_list = create_pool_list(config, train_names)
+
+                if not equal_pool_size:
+                    pool_size = pool_size_list[l]
 
                 if strategy + '_pooling' in dir():
                     ## do the pooling (eval is a python-method that executes a function with a string-input)
