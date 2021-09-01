@@ -228,11 +228,13 @@ def write_train_files(train_names, writefolder, iteration, pool={}):
     filehandle.close()
 
 
-def copy_initial_weight_file(read_folder, write_folder, iter):
+def copy_initial_weight_file(read_folder, weightsfolders, iter):
     weight_file = "best_model_{:s}.pth".format(str(iter).zfill(3))
-    check_direxcist(write_folder)
-    if os.path.exists(os.path.join(read_folder, weight_file)):
-        copyfile(os.path.join(read_folder, weight_file), os.path.join(write_folder, weight_file))
+    for wf in range(len(weightsfolders)):
+        write_folder = weightsfolders[wf]
+        check_direxcist(write_folder)
+        if os.path.exists(os.path.join(read_folder, weight_file)):
+            copyfile(os.path.join(read_folder, weight_file), os.path.join(write_folder, weight_file))
         
 
 def copy_previous_weights(weights_folder, iteration):
@@ -547,6 +549,7 @@ if __name__ == "__main__":
             if not config['resume']:
                 cfg, dataset_dicts_train_init, val_value_init = Train_MaskRCNN(config, weightsfolders[0], gpu_num, 0, 0, config['dropout_probability'][0], init=True)
                 store_initial_files(cfg, config, dataset_dicts_train_init, val_value_init, weightsfolders)
+                copy_initial_weight_file(weightsfolders[0], weightsfolders, 0)
             else:
                 cfg, dataset_dicts_train_init, val_value_init = load_initial_files(config, weightsfolders)
 
@@ -555,7 +558,6 @@ if __name__ == "__main__":
                 if e == 0:
                     cfg_init = Eval_MaskRCNN(cfg, config, dataset_dicts_train_init, weightsfolder, resultsfolder, csv_name, 0, init=True)
                 else:
-                    copy_initial_weight_file(weightsfolders[0], weightsfolder, 0)
                     cfg_init = Eval_MaskRCNN(cfg, config, dataset_dicts_train_init, weightsfolder, resultsfolder, csv_name, 0, init=False)
 
                 train_names = get_train_names(dataset_dicts_train_init, config['traindir'])
