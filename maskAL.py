@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-08-31 16:00:25
+# @Last Modified time: 2021-09-01 09:55:43
 
 ## Active learning with Mask R-CNN
 
@@ -19,6 +19,7 @@ import operator
 import logging
 from shutil import copyfile
 from itertools import chain
+import pickle
 from collections import OrderedDict, Counter
 from tqdm import tqdm
 import warnings
@@ -155,6 +156,27 @@ def remove_initial_training_set(dataroot):
     if os.path.exists(os.path.join(dataroot, "initial_train.txt")):
         os.remove(os.path.join(dataroot, "initial_train.txt"))
 
+
+def store_initial_files(cfg, config, dataset_dicts_train_init, val_value_init, weightsfolders):
+    for wf in range(len(weightsfolders)):
+        with open(os.path.join(weightsfolders[wf], "cfg_init.yaml"), "w") as f1:
+            f1.write(cfg.dump())
+        with open(os.path.join(weightsfolders[wf], 'val_value_init.pkl'), 'wb') as f2:
+            pickle.dump(val_value_init, f2)
+
+    with open(os.path.join(config['dataroot'], 'dataset_dicts_train_init.pkl'), 'wb') as f3:
+        pickle.dump(dataset_dicts_train_init, f3)
+
+
+def load_initial_files(config, weightsfolders):
+    cfg = get_cfg()
+    cfg.merge_from_file(os.path.join(weightsfolders[0], "cfg_init.yaml"))
+    with open(os.path.join(weightsfolders[0], 'val_value_init.pkl'), 'rb') as f1:
+        val_value_init = pickle.load(f1)
+    with open(os.path.join(config['dataroot'], 'dataset_dicts_train_init.pkl'), 'rb') as f2:
+        dataset_dicts_train_init = pickle.load(f2)
+    return cfg, dataset_dicts_train_init, val_value_init
+    
 
 def calculate_max_entropy(classes):
     least_confident = np.divide(np.ones(len(classes)), len(classes)).astype(np.float32)
@@ -522,7 +544,11 @@ if __name__ == "__main__":
             
         if config['duplicate_initial_model']:
             ## train Mask R-CNN on the initial-dataset and duplicate the results on the other strategies
-            cfg, dataset_dicts_train_init, val_value_init = Train_MaskRCNN(config, weightsfolders[0], gpu_num, 0, 0, config['dropout_probability'][0], init=True)
+            if not config['resume']:
+                cfg, dataset_dicts_train_init, val_value_init = Train_MaskRCNN(config, weightsfolders[0], gpu_num, 0, 0, config['dropout_probability'][0], init=True)
+                store_initial_files(cfg, config, dataset_dicts_train_init, val_value_init, weightsfolders)
+            else:
+                cfg, dataset_dicts_train_init, val_value_init = load_initial_files(config, weightsfolders)
 
             ## do the evaluation with the same initial-weight-files
             for e, (weightsfolder, resultsfolder, csv_name) in enumerate(zip(weightsfolders, resultsfolders, csv_names)):
