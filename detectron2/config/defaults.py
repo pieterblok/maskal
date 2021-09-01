@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# @Author: Pieter Blok
+# @Date:   2021-06-10 09:59:25
+# @Last Modified by:   Pieter Blok
+# @Last Modified time: 2021-09-01 14:12:59
 # Copyright (c) Facebook, Inc. and its affiliates.
 from .config import CfgNode as CN
 
@@ -510,6 +515,9 @@ _C.SOLVER = CN()
 # See detectron2/solver/build.py for LR scheduler options
 _C.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR"
 
+# Added, so that we can properly read a stored yaml file (cfg.merge_from_file)
+_C.SOLVER.LR_POLICY = "steps_with_decay"
+
 _C.SOLVER.MAX_ITER = 40000
 
 _C.SOLVER.BASE_LR = 0.001
@@ -618,6 +626,9 @@ _C.CUDNN_BENCHMARK = False
 # The period (in terms of steps) for minibatch visualization at train time.
 # Set to 0 to disable.
 _C.VIS_PERIOD = 0
+
+# Added, so that we can properly read a stored yaml file (cfg.merge_from_file)
+_C.NUM_GPUS = 1
 
 # global config is for quick hack purposes.
 # You can set them in command line or config files,

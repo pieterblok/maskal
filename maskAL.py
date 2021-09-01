@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-09-01 09:55:43
+# @Last Modified time: 2021-09-01 14:16:30
 
 ## Active learning with Mask R-CNN
 
@@ -230,7 +230,7 @@ def write_train_files(train_names, writefolder, iteration, pool={}):
 
 def copy_initial_weight_file(read_folder, weightsfolders, iter):
     weight_file = "best_model_{:s}.pth".format(str(iter).zfill(3))
-    for wf in range(len(weightsfolders)):
+    for wf in range(1, len(weightsfolders)):
         write_folder = weightsfolders[wf]
         check_direxcist(write_folder)
         if os.path.exists(os.path.join(read_folder, weight_file)):
