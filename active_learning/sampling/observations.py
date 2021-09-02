@@ -1,7 +1,10 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 15:03:44
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-03-25 15:17:14
+# @Last Modified time: 2021-09-02 17:51:31
+
+# This function is inspired by the uncertainty_aware_dropout function:
+# https://github.com/RovelMan/active-learning-framework/blob/master/al_framework/strategies/dropout.py
 
 import numpy as np
 import torch
