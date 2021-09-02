@@ -14,7 +14,7 @@ See [INSTALL.md](INSTALL.md)
 <br/> <br/>
 
 ## Annotation procedure
-See [ANNOTATION.md](../ANNOTATION.md)
+See [ANNOTATION.md](ANNOTATION.md)
 <br/> <br/>
 
 ## Iterative sampling and annotation
@@ -55,7 +55,7 @@ Change the following settings in the maskAL.yaml file: <br/>
 | loops		 	| The number of active learning sampling iterations (default value: 5)									|
 <br/>
 
-Description of the other settings in the maskAL.yaml file: [MISC_SETTINGS.md](../MISC_SETTINGS.md)
+Description of the other settings in the maskAL.yaml file: [MISC_SETTINGS.md](MISC_SETTINGS.md)
 <br/>
 
 Please refer to the folder **active_learning/config** for more setting-files. 
