@@ -10,7 +10,7 @@ Active learning automatically selects the most-informative images to annotate an
 ![maskAL_graph](./demo/maskAL_vs_random.png?raw=true)
 
 ## maskAL installation
-See [INSTALL.md](../INSTALL.md)
+See [INSTALL.md](INSTALL.md)
 <br/> <br/>
 
 ## Annotation procedure
