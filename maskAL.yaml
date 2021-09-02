@@ -1,5 +1,5 @@
 # Parameters for maskAL
-# python maskAL.py --config active_learning/config/maskAL.yaml
+# python maskAL.py --config maskAL.yaml
 # explanation can be found here: https://git.wur.nl/blok012/maskAL
 
 # folders
