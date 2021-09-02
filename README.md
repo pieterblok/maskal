@@ -1,4 +1,4 @@
-# maskAL - Active learning for Mask R-CNN
+# maskAL - active learning for Mask R-CNN in Detectron2
 
 ## Summary
 Active learning automatically selects the most-informative images to annotate and retrain the algorithm. Active learning strives to reduce the number of annotations, without affecting the performance of the algorithm. Generally speaking, active learning involves the following steps:
@@ -7,43 +7,66 @@ Active learning automatically selects the most-informative images to annotate an
 3. Annotate the most-informative images, and then retrain the algorithm on the most informative-images
 4. Repeat step 1-3 until the desired performance is reached (or when you are tired of doing annotations) <br/><br/>
 
-## Installation of the software
+![maskAL_graph](./demo/maskAL_vs_random.png?raw=true)
+
+## maskAL installation
 See [INSTALL.md](../INSTALL.md)
 <br/> <br/>
 
 ## Annotation procedure
-Because active learning involves an iterative annotation of the most-informative images, we assume that the training, validation and test images have their corresponding json/xml annotations from the either the **labelme** software, **v7-darwin** software or **cvat** software. Our default annotation procedure is based on the **labelme** software. Please find the installation instructions of labelme on: https://github.com/wkentaro/labelme.
-<br/>
-
-**It is not required to annotate all images yet, because the active learning algorithm will select the most-informative images for you to annotate.** <br/>
-
-*Annotation procedure (labelme):*
-1. Annotate each individual object by either a polygon, a circle or a rectangle. For our use-case, the polygon was the default shape.
-2. Assign the correct class-name to the object. 
-3. When an object consists of two or more separated parts: draw each separated part by an individual polygon and link the polygons by the same group id.
-<br/> <br/> ![LabelMe annotation](./demo/labelme_annotation.png?raw=true)
-<br/> *The broccoli head of the class "cateye" is occluded by a leaf, causing two separated instances of the broccoli head. Annotate the individual instances by a separate polygon and link them with an unique group_id (in this example 1). Suppose there is another occluded broccoli head in the image: then use another group_id (for example 2).*
+See [ANNOTATION.md](../ANNOTATION.md)
 <br/> <br/>
 
-## Dataset preparation
-Place all images and annotations in one folder. Remember that it is not required to annotate every single image in the folder, because we only want to annotate the most-informative images. <br/> 
+## Iterative sampling and annotation
+We advise you to split the images and annotations in a training set, validation set and a test set. Remember that it is not required to annotate every single image in the folder, because we only want to annotate the most-informative images. <br/> 
 
-1. The active-learning algorithm random samples a big train-set (the size of the train-set is specified by a ratio). 
-2. From the big train-set, a smaller initial train-set is randomly sampled (its size can be specified). The images that do not have an annotation are placed in the **annotate** subfolder inside your image folder. You first need to annotate these images with labelme (json), v7-darwin (json) or cvat (xml). 
-3. The same procedure is repeated for the validation and test-set (the size of these sets are specified with another ratio). 
-4. After the first training iteration, the sampling algorithm will infer the algorithm on the remaining images of the big train-set, to select the ones that are most-informative. The size of this  **image pool** can be specified as well.
-5. The images in the pool that lack an annotation, are placed in the **annotate** subfolder, so that they can be annotated with labelme (json), v7-darwin (json) or cvat (xml). 
-6. Step 4-5 are repeated for several training iterations. The number of iterations can be specified. 
+1. From the big training set, a smaller initial set is randomly sampled (its size can be specified in the **maskAL.yaml** file). The images that do not have an annotation are placed in the **annotate** subfolder inside your image folder. You first need to annotate these images with labelme (json), v7-darwin (json) or cvat (xml). 
+2. This procedure is repeated for the validation set and the test set (the file locations can be specified in the **maskAL.yaml** file). 
+3. After the first training iteration, the sampling algorithm selects the most-informative images (its size can be specified as well in the **maskAL.yaml** file).
+4. The most-informative images that don't have an annotation, are placed in the **annotate** subfolder, so that they can be annotated with labelme (json), v7-darwin (json) or cvat (xml). 
+5. Step 4-5 are repeated for several training iterations. The number of iterations is specified in the **maskAL.yaml** file. 
 
-<br/>**Please note that this method does not work with the default COCO json-files of detectron2. These json-files summarize all annotations that have been completed before the training starts. Because active learning involves an iterative train and annotation procedure, these COCO-jsons lack the desired format.** 
+Please note that this method does not work with the default COCO json-files of detectron2. These json-files summarize all annotations that have been completed before the training starts. Because active learning involves an iterative train and annotation procedure, these COCO-jsons lack the desired format.
 <br/><br/>
 
-## Active learning
-See [maskAL.py](maskAL.py)
+## How to use maskAL
+1. open a terminal
+2. cd maskAL
+3. activate the maskAL virtual environment (conda activate maskAL)
+4. python maskAL.py --config maskAL.yaml <br/> <br/>
+
+Change the following settings in the maskAL.yaml file: <br/>
+
+| Setting        	| Description           														|
+| ----------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| weightsroot	        | The file directory where the weight-files are stored											|
+| resultsroot		| The file directory where the result-files are stored 											|
+| dataroot	 	| The root directory where all image-files are stored											|
+| traindir	 	| The file directory where the training images and annotations are stored								|
+| valdir	 	| The file directory where the validation images and annotations are stored								|
+| testdir	 	| The file directory where the test images and annotations are stored									|
+| cuda_visible_devices 	| The identifiers of the CUDA device(s) you want to use for training and sampling							|
+| classes	 	| The names of the classes of the annotated instances											|
+| learning_rate	 	| The learning-rate to train Mask R-CNN (default value: 0.01)										|
+| confidence_threshold 	| Confidence-threshold for the image inference with Mask R-CNN (default value: 0.5)							|
+| nms_threshold 	| Non-maximum suppression threshold for the image inference with Mask R-CNN (default value: 0.3)					|
+| initial_datasize 	| The size of the initial dataset, which will be randomly pooled from the traindir when starting the active learning (default value: 100)|
+| pool_size	 	| The number of selected images from the traindir when doing the active learning sampling (default value: 200)				|
+| loops		 	| The number of active learning sampling iterations (default value: 5)									|
+<br/>
+
+Description of the other settings in the maskAL.yaml file: [MISC_SETTINGS.md](../MISC_SETTINGS.md)
+<br/>
+
+Please refer to the folder **active_learning/config** for more setting-files. 
+<br/> <br/>
+
+## Citation
+Please refer to our research article for more information or cross-referencing: 
 <br/> <br/>
 
 ## License
-Our software was forked from detectron2 (https://github.com/facebookresearch/detectron2). As such, the software will be released under the [Apache 2.0 license](LICENSE). <br/><br/>
+Our software was forked from Detectron2 (https://github.com/facebookresearch/detectron2). As such, the software will be released under the [Apache 2.0 license](LICENSE). <br/><br/>
 
 ## Acknowledgements
 maskAL was developed by Pieter Blok (pieter.blok@wur.nl).<br/><br/>
