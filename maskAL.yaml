@@ -27,7 +27,7 @@ checkpoint_period: 500
 weight_decay: 0.0001
 learning_policy: 'steps_with_decay'
 gamma: 0.1
-train_batch_size: 2
+train_batch_size: 1
 num_workers: 2
 
 # train-sampler
@@ -37,19 +37,19 @@ repeat_factor_smallest_class: 1.0
 
 # evaluation-parameters
 confidence_threshold: 0.5
-nms_threshold: 0.01
+nms_threshold: 0.3
 
 # active-learning sampling
 experiment_name: 'exp1'
-strategies: ['uncertainty', 'random', 'certainty']
-mode: ['min', ' ', 'mean']
+strategies: 'uncertainty'
+mode: 'mean'
 initial_datasize: 100
 pool_size: 200
 equal_pool_size: True
-loops: 12
-dropout_probability: 0.5
-mcd_iterations: 5
+loops: 5
+dropout_probability: 0.25
+mcd_iterations: 20
 dropout_method: 'head'
-al_batch_size: 5
+al_batch_size: 1
 iou_thres: 0.5
 resume: False
