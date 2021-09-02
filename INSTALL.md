@@ -75,7 +75,7 @@ Tested with: Pytorch 1.8.0 & torchvision 0.9.0 (Ubuntu 16.04/18.04 and CUDA 10.1
 - conda activate maskAL <br/> <br/>
 
 **2.3) Download the code repository:**
-- git clone https://git.wur.nl/blok012/maskAL.git
+- git clone https://github.com/pieterblok/maskAL.git
 - cd maskAL <br/> <br/>
 
 **2.4) Install the required software libraries (in the maskAL virtual environment, using the terminal):**
