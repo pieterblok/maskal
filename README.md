@@ -66,4 +66,7 @@ Please refer to our research article for more information or cross-referencing:
 <br/> <br/>
 
 ## License
-Our software was forked from Detectron2 (https://github.com/facebookresearch/detectron2). As such, the software will be released under the [Apache 2.0 license](LICENSE). <br/>
+Our software was forked from Detectron2 (https://github.com/facebookresearch/detectron2). As such, the software will be released under the [Apache 2.0 license](LICENSE). <br/> <br/>
+
+## Contact
+maskAL was developed by Pieter Blok <br/>
