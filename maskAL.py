@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-09-01 14:16:30
+# @Last Modified time: 2021-09-14 12:13:32
 
 ## Active learning with Mask R-CNN
 
@@ -516,7 +516,7 @@ if __name__ == "__main__":
     logger.info("Starting main-application")
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='./active_learning/config/maskAL.yaml', help='yaml with the training parameters')
+    parser.add_argument('--config', type=str, default='maskAL.yaml', help='yaml with the training parameters')
     args = parser.parse_args()
 
     try:
