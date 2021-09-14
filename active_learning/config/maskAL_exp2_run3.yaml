@@ -8,14 +8,14 @@ resultsroot: "./results"
 dataroot: "./datasets/exp2/run3"
 traindir: "./datasets/train"
 valdir: "./datasets/val"
-testdir: "./datasets/test02"
+testdir: "./datasets/test03"
 
 # training-parameters
 cuda_visible_devices: '2'
 classes: ['healthy', 'damaged', 'matured', 'cateye', 'headrot']
 transfer_learning_on_previous_models: True
 train_complete_trainset: False
-duplicate_initial_model: False
+duplicate_initial_model: True
 learning_rate: 0.01
 warmup_iterations: 500
 train_iterations_base: 2500
@@ -42,14 +42,15 @@ nms_threshold: 0.01
 # active-learning sampling
 experiment_name: 'exp2/run3'
 strategies: 'uncertainty'
-mode: ['mean', 'mean', 'min', 'min', 'mean', 'mean', 'min', 'min', 'mean', 'mean', 'min', 'min']
+mode: 'mean'
 initial_datasize: 100
-pool_size: 200
-equal_pool_size: True
-loops: 12
-dropout_probability: [0.25, 0.25, 0.25, 0.25, 0.50, 0.50, 0.50, 0.50, 0.75, 0.75, 0.75, 0.75]
-mcd_iterations: [20, 40, 20, 40, 20, 40, 20, 40, 20, 40, 20, 40]
+pool_size: [50, 100, 200, 400, [50, 100, 200], [100, 200, 400], [200, 400]]
+equal_pool_size: [True, True, True, True, False, False, False]
+loops: [48, 24, 12, 6, [8, 4, 8], [4, 2, 4], [4, 4]]
+dropout_probability: 0.25
+mcd_iterations: 20
 dropout_method: 'head'
 al_batch_size: 1
 iou_thres: 0.5
 resume: False
+pre_annotate: False

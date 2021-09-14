@@ -5,7 +5,7 @@
 # folders
 weightsroot: "./weights"
 resultsroot: "./results"
-dataroot: "./datasets/exp1/repeat_factor_training_sampler_1.5"
+dataroot: "./datasets/pexp0/repeat_factor_training_sampler_3.0"
 traindir: "./datasets/train"
 valdir: "./datasets/val"
 testdir: "./datasets/test01"
@@ -33,14 +33,14 @@ num_workers: 2
 # train-sampler
 train_sampler: "RepeatFactorTrainingSampler"
 minority_classes: ['damaged', 'matured', 'cateye', 'headrot']
-repeat_factor_smallest_class: 1.5
+repeat_factor_smallest_class: 3.0
 
 # evaluation-parameters
 confidence_threshold: 0.5
 nms_threshold: 0.01
 
 # active-learning sampling
-experiment_name: 'exp1/repeat_factor_training_sampler_1.5'
+experiment_name: 'pexp0/repeat_factor_training_sampler_3.0'
 strategies: ['uncertainty', 'random', 'certainty']
 mode: ['min', ' ', 'mean']
 initial_datasize: 100
@@ -53,3 +53,4 @@ dropout_method: 'head'
 al_batch_size: 5
 iou_thres: 0.5
 resume: False
+pre_annotate: False
