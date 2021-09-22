@@ -20,13 +20,14 @@ See [ANNOTATION.md](ANNOTATION.md)
 ## Iterative sampling and annotation
 We advise you to split the images and annotations in a training set, validation set and a test set. Remember that it is not required to annotate every single image in the folder, because we only want to annotate the most-informative images. <br/> 
 
-1. From the big training set, a smaller initial set is randomly sampled (its size can be specified in the **maskAL.yaml** file). The images that do not have an annotation are placed in the **annotate** subfolder inside your image folder. You first need to annotate these images with labelme (json), v7-darwin (json) or cvat (xml). 
+1. From the big training set, a smaller initial set is randomly sampled (its size can be specified in the **maskAL.yaml** file). The images that do not have an annotation are placed in the **annotate** subfolder inside your image folder. You first need to annotate these images with LabelMe (json), V7-Darwin (json) or CVAT (xml) (when using CVAT, export the annotations to **LabelMe 3.0** format). 
 2. This procedure is repeated for the validation set and the test set (the file locations can be specified in the **maskAL.yaml** file). 
 3. After the first training iteration, the sampling algorithm selects the most-informative images (its size can be specified as well in the **maskAL.yaml** file).
-4. The most-informative images that don't have an annotation, are placed in the **annotate** subfolder, so that they can be annotated with labelme (json), v7-darwin (json) or cvat (xml). 
-5. Step 4-5 are repeated for several training iterations. The number of iterations is specified in the **maskAL.yaml** file. 
+4. The most-informative images that don't have an annotation, are placed in the **annotate** subfolder, so that they can be annotated with LabelMe (json), V7-Darwin (json) or CVAT (xml) (when using CVAT, export the annotations to **LabelMe 3.0** format). 
+5. You can also use the trained model to make predictions on the unlabelled images to further reduce annotation time. Activate **auto_annotate** in the **maskAL.yaml** file, and specify the **export_format** (currently only **'labelme'** and **'cvat'** are supported). 
+6. Step 3-5 are repeated for several training iterations. The number of iterations (**loops**) is specified in the **maskAL.yaml** file.
 
-Please note that this method does not work with the default COCO json-files of detectron2. These json-files summarize all annotations that have been completed before the training starts. Because active learning involves an iterative train and annotation procedure, these COCO-jsons lack the desired format.
+Please note that this method does not work with the default COCO json-files of detectron2. These json-files contain all annotations that have been completed before the training starts. Because active learning involves an iterative train and annotation procedure, these COCO-jsons lack the desired format.
 <br/><br/>
 
 ## How to use maskAL
@@ -53,6 +54,8 @@ Change the following settings in the maskAL.yaml file: <br/>
 | initial_datasize 	| The size of the initial dataset, which will be randomly pooled from the traindir when starting the active learning (default value: 100)|
 | pool_size	 	| The number of selected images from the traindir when doing the active learning sampling (default value: 200)				|
 | loops		 	| The number of active learning sampling iterations (default value: 5)									|
+| auto_annotate	 	| Set this to **True** when you want the model to make predictions on the unlabelled images to further reduce annotation time 		|
+| export_format	 	| When auto_annotate is activated: specifiy the export-format of the annotations (currently supported formats: **'labelme'**, **'cvat'**)	|
 <br/>
 
 Description of the other settings in the maskAL.yaml file: [MISC_SETTINGS.md](MISC_SETTINGS.md)
