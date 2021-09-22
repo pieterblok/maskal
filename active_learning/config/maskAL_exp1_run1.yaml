@@ -53,4 +53,5 @@ dropout_method: 'head'
 al_batch_size: 1
 iou_thres: 0.5
 resume: False
-pre_annotate: False
+auto_annotate: False
+export_format: labelme

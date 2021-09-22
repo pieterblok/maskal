@@ -41,15 +41,17 @@ nms_threshold: 0.01
 
 # active-learning sampling
 experiment_name: 'exp3/run4'
-strategies: ['uncertainty', 'random', 'certainty']
-mode: ['mean', ' ', 'mean']
+strategies: ['uncertainty', 'random']
+mode: ['mean', ' ']
 initial_datasize: 100
-pool_size: 400
+pool_size: 200
 equal_pool_size: True
-loops: 6
+loops: 12
 dropout_probability: 0.25
 mcd_iterations: 20
 dropout_method: 'head'
 al_batch_size: 5
 iou_thres: 0.5
 resume: False
+auto_annotate: False
+export_format: labelme
