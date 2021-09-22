@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-09-14 12:13:32
+# @Last Modified time: 2021-09-21 16:57:08
 
 ## Active learning with Mask R-CNN
 
@@ -603,7 +603,7 @@ if __name__ == "__main__":
 
                     ## update the training list and retrain the algorithm
                     train_list = train_names + list(pool.keys())
-                    update_train_dataset(config['dataroot'], config['traindir'], config['classes'], train_list)
+                    update_train_dataset(cfg, config['dataroot'], config['traindir'], config['classes'], train_list, config['auto_annotate'], config['export_format'])
                     cfg, dataset_dicts_train, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, l+1, val_value, dropout_probability, init=False)
 
                     ## evaluate and write the pooled image-names to a txt-file

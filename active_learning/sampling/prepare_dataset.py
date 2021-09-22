@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-07-06 11:52:00
+# @Last Modified time: 2021-09-22 20:10:07
 
 import sys
 import random
@@ -10,12 +10,14 @@ import numpy as np
 import shutil
 import cv2
 import json
+import xml.etree.cElementTree as ET
 import math
 import datetime
 import time
 from tqdm import tqdm
 import xmltodict
 import logging
+from detectron2.engine import DefaultPredictor
 
 
 ## initialize the logging
@@ -637,7 +639,7 @@ def create_json(rootdir, imgdir, images, classes, name):
         json.dump(writedata, outfile)
 
 
-def check_json_presence(imgdir, dataset, name):
+def check_json_presence(imgdir, dataset, name, cfg=[], all_classes=[], pre_annotate=False, export_format=[]):
     print("")
     print("Checking {:s} annotations...".format(name))
     rename_xml_files(imgdir)
@@ -676,27 +678,63 @@ def check_json_presence(imgdir, dataset, name):
             shutil.copyfile(os.path.join(imgdir, image_copy), os.path.join(annot_folder, image_copy))
 
     ## check whether all images have been annotated in the "annotate" subdirectory
-    while len(diff_img_annot) > 0:
-        rename_xml_files(annot_folder)
-        images, annotations = list_files(annot_folder)
-        img_basenames = [os.path.splitext(img)[0] for img in images]
-        annotation_basenames = [os.path.splitext(annot)[0] for annot in annotations]
-        
-        diff_img_annot = []
-        for c in range(len(img_basenames)):
-            img_basename = img_basenames[c]
-            if img_basename not in annotation_basenames:
-                diff_img_annot.append(img_basename)
-        diff_img_annot.sort()
+    if not pre_annotate:
+        while len(diff_img_annot) > 0:
+            rename_xml_files(annot_folder)
+            images, annotations = list_files(annot_folder)
+            img_basenames = [os.path.splitext(img)[0] for img in images]
+            annotation_basenames = [os.path.splitext(annot)[0] for annot in annotations]
+            
+            diff_img_annot = []
+            for c in range(len(img_basenames)):
+                img_basename = img_basenames[c]
+                if img_basename not in annotation_basenames:
+                    diff_img_annot.append(img_basename)
+            diff_img_annot.sort()
 
+            if len(diff_img_annot) > 0:
+                if len(diff_img_annot) != cur_annot_diff:
+                    print("Go to the folder {:s}".format(annot_folder))
+                    print("and annotate the following images:")
+                    for i in range(len(diff_img_annot)):
+                        print(diff_img_annot[i])
+                    cur_annot_diff = len(diff_img_annot)
+                    print("")
+
+    else:
         if len(diff_img_annot) > 0:
-            if len(diff_img_annot) != cur_annot_diff:
-                print("Go to the folder {:s}".format(annot_folder))
-                print("and annotate the following images:")
-                for i in range(len(diff_img_annot)):
-                    print(diff_img_annot[i])
-                cur_annot_diff = len(diff_img_annot)
-                print("")
+            rename_xml_files(annot_folder)
+            images, annotations = list_files(annot_folder)
+            predictor = DefaultPredictor(cfg)
+
+            for i in tqdm(range(len(images))):
+                # Load the RGB image
+                imgname = images[i]
+                basename = os.path.basename(imgname)
+                img = cv2.imread(os.path.join(annot_folder, imgname))
+                height, width, _ = img.shape
+
+                # Do the image inference and extract the outputs from Mask R-CNN
+                outputs = predictor(img)
+                instances = outputs["instances"].to("cpu")
+                classes = instances.pred_classes.numpy()
+                masks = instances.pred_masks.numpy()
+
+                class_names = []
+                for h in range(len(classes)):
+                    class_id = classes[h]
+                    class_name = all_classes[class_id]
+                    class_names.append(class_name)
+
+                if export_format == 'labelme':
+                    write_labelme_annotations(annot_folder, basename, class_names, masks, height, width)
+                elif export_format == 'cvat':
+                    write_cvat_annotations(annot_folder, basename, class_names, masks, height, width)
+                else:
+                    logger.error("unsupported export_format in the maskAL.yaml file")
+                    sys.exit("Closing application")
+
+            input("Press Enter when all annotations have been checked...")
 
     if os.path.isdir(annot_folder):
         ## copy the annotations back to the imgdir
@@ -711,6 +749,163 @@ def check_json_presence(imgdir, dataset, name):
         if annot_folder_present:
             time.sleep(1)
             shutil.rmtree(annot_folder)
+
+
+def write_labelme_annotations(write_dir, basename, class_names, masks, height, width):
+    masks = masks.astype(np.uint8)
+
+    if masks.any():
+        writedata = {}
+        writedata['version'] = "4.5.6"
+        writedata['flags'] = {}
+        writedata['shapes'] = []
+        writename = basename
+
+        md, mh, mw = masks.shape
+        maskstransposed = masks.transpose(1,2,0) # transform the mask in the same format as the input image array (h,w,num_dets)
+
+        for i in range (maskstransposed.shape[-1]):
+            groupid = 1
+            masksel = maskstransposed[:,:,i] # select the individual masks
+            class_name = class_names[i]
+            contours, hierarchy = cv2.findContours((masksel*255).astype(np.uint8),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+            cnt = np.concatenate(contours)
+               
+            if cv2.contourArea(cnt) > 50:
+                if len(contours) == 1:
+                    segm = np.vstack(contours).squeeze()
+                    x = [int(segm[idx][0]) for idx in range(len(segm))]
+                    y = [int(segm[idx][1]) for idx in range(len(segm))]
+                    xy = list(zip(x, y))
+
+                    writedata['shapes'].append({
+                        'label': class_name,
+                        'line_color': None,
+                        'fill_color': None,
+                        'points': xy,
+                        'group_id': None,
+                        'shape_type': "polygon",
+                        'flags': {}
+                    })
+
+                elif len(contours) > 1:
+                    for s in range(len(contours)):
+                        cnt = contours[s]
+                        segm = np.vstack(cnt).squeeze()
+                        x = [int(segm[idx][0]) for idx in range(len(segm))]
+                        y = [int(segm[idx][1]) for idx in range(len(segm))]
+                        xy = list(zip(x, y))
+
+                        writedata['shapes'].append({
+                            'label': class_name,
+                            'line_color': None,
+                            'fill_color': None,
+                            'points': xy,
+                            'group_id': groupid,
+                            'shape_type': "polygon",
+                            'flags': {}
+                        })
+
+                    groupid = groupid + 1
+                        
+        writedata['lineColor'] = [0,255,0,128]
+        writedata['fillColor'] = [255,0,0,128]
+        writedata['imagePath'] = writename
+        writedata['imageData'] = None
+        writedata['imageHeight'] = height
+        writedata['imageWidth'] = width
+
+        jn = os.path.splitext(basename)[0] +'.json'
+        with open(os.path.join(write_dir, jn), 'w') as outfile:
+            json.dump(writedata, outfile)
+
+
+def write_cvat_annotations(write_dir, basename, class_names, masks, height, width):
+    masks = masks.astype(np.uint8)
+
+    if masks.any():
+        annot = ET.Element("annotation")
+        ET.SubElement(annot, "filename").text = basename
+        ET.SubElement(annot, "folder")
+
+        source = ET.SubElement(annot, "source")
+        ET.SubElement(source, "sourceImage")
+        ET.SubElement(source, "sourceAnnotation").text = "Datumaro"
+
+        imagesize = ET.SubElement(annot, "imagesize")
+        ET.SubElement(imagesize, "nrows").text = str(height).rstrip()
+        ET.SubElement(imagesize, "ncols").text = str(width).rstrip()
+
+        md, mh, mw = masks.shape
+        maskstransposed = masks.transpose(1,2,0) # transform the mask in the same format as the input image array (h,w,num_dets)
+        polygons = 1
+
+        for i in range (maskstransposed.shape[-1]):
+            masksel = maskstransposed[:,:,i] # select the individual masks
+            class_name = class_names[i]
+            contours, hierarchy = cv2.findContours((masksel*255).astype(np.uint8),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+            cnt = np.concatenate(contours)
+
+            if cv2.contourArea(cnt) > 50:
+                if len(contours) == 1:
+                    xmlobj = ET.SubElement(annot, "object")
+                    ET.SubElement(xmlobj, "name").text = class_name
+                    ET.SubElement(xmlobj, "deleted").text = str(0).rstrip()
+                    ET.SubElement(xmlobj, "verified").text = str(0).rstrip()
+                    ET.SubElement(xmlobj, "occluded").text = "no"
+                    ET.SubElement(xmlobj, "date")
+                    ET.SubElement(xmlobj, "id").text = str(polygons).rstrip()
+                    
+                    parts = ET.SubElement(xmlobj, "parts")
+                    ET.SubElement(parts, "hasparts")
+                    ET.SubElement(parts, "ispartof")
+
+                    segm = np.vstack(contours).squeeze()                
+                    polygon = ET.SubElement(xmlobj, "polygon")
+                    for j in range(len(segm)):
+                        pt = ET.SubElement(polygon, "pt")
+                        ET.SubElement(pt, "x").text = str(segm[j][0]).rstrip()
+                        ET.SubElement(pt, "y").text = str(segm[j][1]).rstrip()
+                    ET.SubElement(polygon, "username")
+                    ET.SubElement(xmlobj, "attributes")    
+
+                    polygons += 1
+
+                elif len(contours) > 1:
+                    for s in range(len(contours)):
+                        xmlobj = ET.SubElement(annot, "object")
+                        ET.SubElement(xmlobj, "name").text = class_name
+                        ET.SubElement(xmlobj, "deleted").text = str(0).rstrip()
+                        ET.SubElement(xmlobj, "verified").text = str(0).rstrip()
+                        ET.SubElement(xmlobj, "occluded").text = "no"
+                        ET.SubElement(xmlobj, "date")
+                        ET.SubElement(xmlobj, "id").text = str(polygons).rstrip()
+
+                        parts = ET.SubElement(xmlobj, "parts")
+                        if s == 0:
+                            ET.SubElement(parts, "hasparts").text = str(len(contours)).rstrip()
+                            ET.SubElement(parts, "ispartof")
+                            polygon_id = polygons
+                        else:
+                            ET.SubElement(parts, "hasparts")
+                            ET.SubElement(parts, "ispartof").text = str(polygon_id).rstrip()
+
+                        cnt = contours[s]
+                        segm = np.vstack(cnt).squeeze()
+                            
+                        polygon = ET.SubElement(xmlobj, "polygon")
+                        for j in range(len(segm)):
+                            pt = ET.SubElement(polygon, "pt")
+                            ET.SubElement(pt, "x").text = str(segm[j][0]).rstrip()
+                            ET.SubElement(pt, "y").text = str(segm[j][1]).rstrip()
+                        ET.SubElement(polygon, "username")
+                        ET.SubElement(xmlobj, "attributes")
+
+                        polygons += 1
+
+        tree = ET.ElementTree(annot)
+        xmln = os.path.splitext(basename)[0] +'.xml'
+        tree.write(os.path.join(write_dir, xmln))
 
 
 ## the function below is heavily inspired by the function "repeat_factors_from_category_frequency" in maskAL/detectron2/data/samplers/distributed_sampler.py
@@ -809,14 +1004,14 @@ def prepare_complete_dataset(rootdir, classes, traindir, valdir, testdir):
         sys.exit("Closing application")            
 
 
-def update_train_dataset(rootdir, imgdir, classes, train_list):
+def update_train_dataset(cfg, rootdir, imgdir, classes, train_list, pre_annotate, export_format):
     try:
         rename_xml_files(imgdir)
         images, annotations = list_files(imgdir)
         print("{:d} images found!".format(len(images)))
         print("{:d} annotations found!".format(len(annotations)))
 
-        check_json_presence(imgdir, train_list, "train")
+        check_json_presence(imgdir, train_list, "train", cfg, classes, pre_annotate, export_format)
         print("Converting annotations...")
         create_json(rootdir, imgdir, train_list, classes, "train")
     except:
