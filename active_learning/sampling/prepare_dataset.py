@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-09-22 20:10:07
+# @Last Modified time: 2021-09-23 16:03:33
 
 import sys
 import random
@@ -336,7 +336,8 @@ def process_cvat_xml(xmlfile, classnames):
         group_ids.append(int(obj['id']))            
             
     unique_group_ids = list(set(group_ids))
-    total_masks = len(unique_group_ids)
+    unique_group_ids.sort()
+    total_masks = len(unique_group_ids)        
 
     category_ids = []
     masks = []
@@ -351,7 +352,8 @@ def process_cvat_xml(xmlfile, classnames):
     if isinstance(data['annotation']['object'], list):
         for p in range(len(data['annotation']['object'])):
             obj = data['annotation']['object'][p]
-            fill_id = group_ids[p]
+            fid = group_ids[p]
+            fill_id = unique_group_ids.index(fid)
             classname = obj['name']
 
             try:
@@ -763,6 +765,7 @@ def write_labelme_annotations(write_dir, basename, class_names, masks, height, w
 
         md, mh, mw = masks.shape
         maskstransposed = masks.transpose(1,2,0) # transform the mask in the same format as the input image array (h,w,num_dets)
+        useful_masks = False
 
         for i in range (maskstransposed.shape[-1]):
             groupid = 1
@@ -772,6 +775,7 @@ def write_labelme_annotations(write_dir, basename, class_names, masks, height, w
             cnt = np.concatenate(contours)
                
             if cv2.contourArea(cnt) > 50:
+                useful_masks = True
                 if len(contours) == 1:
                     segm = np.vstack(contours).squeeze()
                     x = [int(segm[idx][0]) for idx in range(len(segm))]
@@ -816,8 +820,9 @@ def write_labelme_annotations(write_dir, basename, class_names, masks, height, w
         writedata['imageWidth'] = width
 
         jn = os.path.splitext(basename)[0] +'.json'
-        with open(os.path.join(write_dir, jn), 'w') as outfile:
-            json.dump(writedata, outfile)
+        if useful_masks:
+            with open(os.path.join(write_dir, jn), 'w') as outfile:
+                json.dump(writedata, outfile)
 
 
 def write_cvat_annotations(write_dir, basename, class_names, masks, height, width):
@@ -838,7 +843,8 @@ def write_cvat_annotations(write_dir, basename, class_names, masks, height, widt
 
         md, mh, mw = masks.shape
         maskstransposed = masks.transpose(1,2,0) # transform the mask in the same format as the input image array (h,w,num_dets)
-        polygons = 1
+        polygons = 0
+        useful_masks = False
 
         for i in range (maskstransposed.shape[-1]):
             masksel = maskstransposed[:,:,i] # select the individual masks
@@ -847,6 +853,7 @@ def write_cvat_annotations(write_dir, basename, class_names, masks, height, widt
             cnt = np.concatenate(contours)
 
             if cv2.contourArea(cnt) > 50:
+                useful_masks = True
                 if len(contours) == 1:
                     xmlobj = ET.SubElement(annot, "object")
                     ET.SubElement(xmlobj, "name").text = class_name
@@ -883,7 +890,12 @@ def write_cvat_annotations(write_dir, basename, class_names, masks, height, widt
 
                         parts = ET.SubElement(xmlobj, "parts")
                         if s == 0:
-                            ET.SubElement(parts, "hasparts").text = str(len(contours)).rstrip()
+                            hasparts_str = ''
+                            for ss in range(1, len(contours)):
+                                part_id = polygons + ss
+                                hasparts_str = hasparts_str + str(part_id) + ","
+                            hasparts_str = hasparts_str[:-1]
+                            ET.SubElement(parts, "hasparts").text = hasparts_str.rstrip()
                             ET.SubElement(parts, "ispartof")
                             polygon_id = polygons
                         else:
@@ -905,7 +917,8 @@ def write_cvat_annotations(write_dir, basename, class_names, masks, height, widt
 
         tree = ET.ElementTree(annot)
         xmln = os.path.splitext(basename)[0] +'.xml'
-        tree.write(os.path.join(write_dir, xmln))
+        if useful_masks:
+            tree.write(os.path.join(write_dir, xmln))
 
 
 ## the function below is heavily inspired by the function "repeat_factors_from_category_frequency" in maskAL/detectron2/data/samplers/distributed_sampler.py
