@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-09-23 16:03:33
+# @Last Modified time: 2021-09-23 16:09:59
 
 import sys
 import random
@@ -641,6 +641,30 @@ def create_json(rootdir, imgdir, images, classes, name):
         json.dump(writedata, outfile)
 
 
+def highlight_missing_annotations(annot_folder, cur_annot_diff):
+    rename_xml_files(annot_folder)
+    images, annotations = list_files(annot_folder)
+    img_basenames = [os.path.splitext(img)[0] for img in images]
+    annotation_basenames = [os.path.splitext(annot)[0] for annot in annotations]
+    
+    diff_img_annot = []
+    for c in range(len(img_basenames)):
+        img_basename = img_basenames[c]
+        if img_basename not in annotation_basenames:
+            diff_img_annot.append(img_basename)
+    diff_img_annot.sort()
+
+    if len(diff_img_annot) > 0:
+        if len(diff_img_annot) != cur_annot_diff:
+            print("Go to the folder {:s}".format(annot_folder))
+            print("and annotate the following images:")
+            for i in range(len(diff_img_annot)):
+                print(diff_img_annot[i])
+            cur_annot_diff = len(diff_img_annot)
+            print("")
+    return diff_img_annot, cur_annot_diff
+    
+
 def check_json_presence(imgdir, dataset, name, cfg=[], all_classes=[], pre_annotate=False, export_format=[]):
     print("")
     print("Checking {:s} annotations...".format(name))
@@ -682,26 +706,7 @@ def check_json_presence(imgdir, dataset, name, cfg=[], all_classes=[], pre_annot
     ## check whether all images have been annotated in the "annotate" subdirectory
     if not pre_annotate:
         while len(diff_img_annot) > 0:
-            rename_xml_files(annot_folder)
-            images, annotations = list_files(annot_folder)
-            img_basenames = [os.path.splitext(img)[0] for img in images]
-            annotation_basenames = [os.path.splitext(annot)[0] for annot in annotations]
-            
-            diff_img_annot = []
-            for c in range(len(img_basenames)):
-                img_basename = img_basenames[c]
-                if img_basename not in annotation_basenames:
-                    diff_img_annot.append(img_basename)
-            diff_img_annot.sort()
-
-            if len(diff_img_annot) > 0:
-                if len(diff_img_annot) != cur_annot_diff:
-                    print("Go to the folder {:s}".format(annot_folder))
-                    print("and annotate the following images:")
-                    for i in range(len(diff_img_annot)):
-                        print(diff_img_annot[i])
-                    cur_annot_diff = len(diff_img_annot)
-                    print("")
+            diff_img_annot, cur_annot_diff = highlight_missing_annotations(annot_folder, cur_annot_diff)
 
     else:
         if len(diff_img_annot) > 0:
@@ -736,7 +741,8 @@ def check_json_presence(imgdir, dataset, name, cfg=[], all_classes=[], pre_annot
                     logger.error("unsupported export_format in the maskAL.yaml file")
                     sys.exit("Closing application")
 
-            input("Press Enter when all annotations have been checked...")
+            diff_img_annot, cur_annot_diff = highlight_missing_annotations(annot_folder, cur_annot_diff)
+            input("Press Enter when all annotations have been checked in folder: {:s}".format(annot_folder))
 
     if os.path.isdir(annot_folder):
         ## copy the annotations back to the imgdir
