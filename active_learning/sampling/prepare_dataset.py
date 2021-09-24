@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-09-23 16:09:59
+# @Last Modified time: 2021-09-24 13:45:26
 
 import sys
 import random
@@ -742,6 +742,9 @@ def check_json_presence(imgdir, dataset, name, cfg=[], all_classes=[], pre_annot
                     sys.exit("Closing application")
 
             diff_img_annot, cur_annot_diff = highlight_missing_annotations(annot_folder, cur_annot_diff)
+            while len(diff_img_annot) > 0:
+                diff_img_annot, cur_annot_diff = highlight_missing_annotations(annot_folder, cur_annot_diff)
+            
             input("Press Enter when all annotations have been checked in folder: {:s}".format(annot_folder))
 
     if os.path.isdir(annot_folder):
