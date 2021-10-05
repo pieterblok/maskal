@@ -1,11 +1,17 @@
-# maskAL - active learning for Mask R-CNN in Detectron2
+# maskAL - Active learning for Mask R-CNN in Detectron2
+
+<p align="center">
+  <img src="./demo/maskAL_framework.png?raw=true" alt="maskAL_framework"/>
+</p>
 
 ## Summary
-Active learning automatically selects the most-informative images to annotate and retrain the algorithm. Active learning strives to reduce the number of annotations, without affecting the performance of the algorithm. Generally speaking, active learning involves the following steps:
+Active learning automatically selects the most-informative images to annotate and retrain the algorithm. By using active learning, we aim to reduce the number of annotations, without affecting the performance of the algorithm. Generally speaking, active learning involves the following steps:
 1. Train an algorithm on a small subset of a bigger dataset
-2. Infer the trained algorithm on the remaining dataset, and select the most-informative images with a sampling algorithm
+2. Use the trained algorithm to make predictions on the remaining dataset, and select the most-informative images with a sampling algorithm
 3. Annotate the most-informative images, and then retrain the algorithm on the most informative-images
 4. Repeat step 1-3 until the desired performance is reached (or when you are tired of doing annotations) <br/><br/>
+
+The figure below shows the potential of active learning on our dataset. The active learning reached a similar performance after sampling 1100 images as the random image sampling after 2500 images, indicating that 1400 annotations could have been saved (see the black dashed line):
 
 ![maskAL_graph](./demo/maskAL_vs_random.png?raw=true)
 
@@ -13,14 +19,10 @@ Active learning automatically selects the most-informative images to annotate an
 See [INSTALL.md](INSTALL.md)
 <br/> <br/>
 
-## Annotation procedure
-See [ANNOTATION.md](ANNOTATION.md)
-<br/> <br/>
-
-## Iterative sampling and annotation
+## Data preparation
 We advise you to split the images and annotations in a training set, validation set and a test set. Remember that it is not required to annotate every single image in the folder, because we only want to annotate the most-informative images. <br/> 
 
-1. From the big training set, a smaller initial set is randomly sampled (its size can be specified in the **maskAL.yaml** file). The images that do not have an annotation are placed in the **annotate** subfolder inside your image folder. You first need to annotate these images with LabelMe (json), V7-Darwin (json) or CVAT (xml) (when using CVAT, export the annotations to **LabelMe 3.0** format). 
+1. From the big training set, a smaller initial set is randomly sampled (its size can be specified in the **maskAL.yaml** file). The images that do not have an annotation are placed in the **annotate** subfolder inside your image folder. You first need to annotate these images with LabelMe (json), V7-Darwin (json) or CVAT (xml) (when using CVAT, export the annotations to **LabelMe 3.0** format). Refer to our annotation procedure: [ANNOTATION.md](ANNOTATION.md) 
 2. This procedure is repeated for the validation set and the test set (the file locations can be specified in the **maskAL.yaml** file). 
 3. After the first training iteration, the sampling algorithm selects the most-informative images (its size can be specified as well in the **maskAL.yaml** file).
 4. The most-informative images that don't have an annotation, are placed in the **annotate** subfolder, so that they can be annotated with LabelMe (json), V7-Darwin (json) or CVAT (xml) (when using CVAT, export the annotations to **LabelMe 3.0** format). 
@@ -71,5 +73,9 @@ Please refer to our research article for more information or cross-referencing:
 ## License
 Our software was forked from Detectron2 (https://github.com/facebookresearch/detectron2). As such, the software will be released under the [Apache 2.0 license](LICENSE). <br/> <br/>
 
+## Acknowledgments
+Two of our software methods are inspired by RovelMan's software: <br/>
+https://github.com/RovelMan/active-learning-framework<br/> <br/>
+
 ## Contact
-maskAL was developed by Pieter Blok. <br/>
+maskAL is developed and maintained by Pieter Blok. <br/> <br/>
