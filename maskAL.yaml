@@ -48,7 +48,7 @@ pool_size: 200
 equal_pool_size: True
 loops: 5
 dropout_probability: 0.25
-mcd_iterations: 20
+mcd_iterations: 10
 dropout_method: 'head'
 al_batch_size: 1
 iou_thres: 0.5

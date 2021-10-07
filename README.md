@@ -66,6 +66,10 @@ Description of the other settings in the maskAL.yaml file: [MISC_SETTINGS.md](MI
 Please refer to the folder **active_learning/config** for more setting-files. 
 <br/> <br/>
 
+## Troubleshooting
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+<br/> <br/>
+
 ## Citation
 Please refer to our research article for more information or cross-referencing: 
 <br/> <br/>
