@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-09-24 13:45:26
+# @Last Modified time: 2021-10-07 18:21:15
 
 import sys
 import random
@@ -876,16 +876,17 @@ def write_cvat_annotations(write_dir, basename, class_names, masks, height, widt
                     ET.SubElement(parts, "hasparts")
                     ET.SubElement(parts, "ispartof")
 
-                    segm = np.vstack(contours).squeeze()                
-                    polygon = ET.SubElement(xmlobj, "polygon")
-                    for j in range(len(segm)):
-                        pt = ET.SubElement(polygon, "pt")
-                        ET.SubElement(pt, "x").text = str(segm[j][0]).rstrip()
-                        ET.SubElement(pt, "y").text = str(segm[j][1]).rstrip()
-                    ET.SubElement(polygon, "username")
-                    ET.SubElement(xmlobj, "attributes")    
+                    segm = np.vstack(contours).squeeze()
+                    if segm.ndim > 1:                
+                        polygon = ET.SubElement(xmlobj, "polygon")
+                        for j in range(len(segm)):
+                            pt = ET.SubElement(polygon, "pt")
+                            ET.SubElement(pt, "x").text = str(segm[j][0]).rstrip()
+                            ET.SubElement(pt, "y").text = str(segm[j][1]).rstrip()
+                        ET.SubElement(polygon, "username")
+                        ET.SubElement(xmlobj, "attributes")    
 
-                    polygons += 1
+                        polygons += 1
 
                 elif len(contours) > 1:
                     for s in range(len(contours)):
@@ -913,16 +914,16 @@ def write_cvat_annotations(write_dir, basename, class_names, masks, height, widt
 
                         cnt = contours[s]
                         segm = np.vstack(cnt).squeeze()
-                            
-                        polygon = ET.SubElement(xmlobj, "polygon")
-                        for j in range(len(segm)):
-                            pt = ET.SubElement(polygon, "pt")
-                            ET.SubElement(pt, "x").text = str(segm[j][0]).rstrip()
-                            ET.SubElement(pt, "y").text = str(segm[j][1]).rstrip()
-                        ET.SubElement(polygon, "username")
-                        ET.SubElement(xmlobj, "attributes")
+                        if segm.ndim > 1:     
+                            polygon = ET.SubElement(xmlobj, "polygon")
+                            for j in range(len(segm)):
+                                pt = ET.SubElement(polygon, "pt")
+                                ET.SubElement(pt, "x").text = str(segm[j][0]).rstrip()
+                                ET.SubElement(pt, "y").text = str(segm[j][1]).rstrip()
+                            ET.SubElement(polygon, "username")
+                            ET.SubElement(xmlobj, "attributes")
 
-                        polygons += 1
+                            polygons += 1
 
         tree = ET.ElementTree(annot)
         xmln = os.path.splitext(basename)[0] +'.xml'
