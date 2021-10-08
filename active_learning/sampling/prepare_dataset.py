@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-10-07 18:21:15
+# @Last Modified time: 2021-10-08 09:02:43
 
 import sys
 import random
@@ -787,24 +787,7 @@ def write_labelme_annotations(write_dir, basename, class_names, masks, height, w
                 useful_masks = True
                 if len(contours) == 1:
                     segm = np.vstack(contours).squeeze()
-                    x = [int(segm[idx][0]) for idx in range(len(segm))]
-                    y = [int(segm[idx][1]) for idx in range(len(segm))]
-                    xy = list(zip(x, y))
-
-                    writedata['shapes'].append({
-                        'label': class_name,
-                        'line_color': None,
-                        'fill_color': None,
-                        'points': xy,
-                        'group_id': None,
-                        'shape_type': "polygon",
-                        'flags': {}
-                    })
-
-                elif len(contours) > 1:
-                    for s in range(len(contours)):
-                        cnt = contours[s]
-                        segm = np.vstack(cnt).squeeze()
+                    if segm.ndim > 1:
                         x = [int(segm[idx][0]) for idx in range(len(segm))]
                         y = [int(segm[idx][1]) for idx in range(len(segm))]
                         xy = list(zip(x, y))
@@ -814,10 +797,29 @@ def write_labelme_annotations(write_dir, basename, class_names, masks, height, w
                             'line_color': None,
                             'fill_color': None,
                             'points': xy,
-                            'group_id': groupid,
+                            'group_id': None,
                             'shape_type': "polygon",
                             'flags': {}
                         })
+
+                elif len(contours) > 1:
+                    for s in range(len(contours)):
+                        cnt = contours[s]
+                        segm = np.vstack(cnt).squeeze()
+                        if segm.ndim > 1:
+                            x = [int(segm[idx][0]) for idx in range(len(segm))]
+                            y = [int(segm[idx][1]) for idx in range(len(segm))]
+                            xy = list(zip(x, y))
+
+                            writedata['shapes'].append({
+                                'label': class_name,
+                                'line_color': None,
+                                'fill_color': None,
+                                'points': xy,
+                                'group_id': groupid,
+                                'shape_type': "polygon",
+                                'flags': {}
+                            })
 
                     groupid = groupid + 1
                         
