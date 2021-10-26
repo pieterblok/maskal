@@ -1,19 +1,24 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-10-08 09:02:43
+# @Last Modified time: 2021-10-26 17:58:57
 
 import sys
+import io
 import random
 import os
 import numpy as np
 import shutil
 import cv2
+from PIL import Image
 import json
 import xml.etree.cElementTree as ET
 import math
 import datetime
 import time
+import json
+import zlib
+import base64
 from tqdm import tqdm
 import xmltodict
 import logging
@@ -413,6 +418,79 @@ def process_cvat_xml(xmlfile, classnames):
     return category_ids, masks, crowd_ids, status
 
 
+def process_supervisely_json(jsonfile, classnames):
+    with open(jsonfile, 'r') as json_file:
+        data = json.load(json_file)
+
+    total_masks = len(data['objects'])
+    category_ids = []
+    masks = []
+    crowd_ids = []
+
+    for i in range(total_masks):
+        category_ids.append([])
+        masks.append([])
+        crowd_ids.append([])
+
+    fill_id = 0 
+
+    for p in data['objects']:
+        classname = p['classTitle']
+
+        try:
+            category_id = int(np.where(np.asarray(classnames) == classname)[0][0] + 1)
+            category_ids[fill_id] = category_id
+            run_further = True
+        except:
+            print("Cannot find the class name (please check the annotation files)")
+            run_further = False
+
+        if run_further:
+            if 'bitmap' in p:
+                if 'data' in p['bitmap']:
+                    ## https://legacy.docs.supervise.ly/ann_format/
+                    final_mask = np.zeros((data['size']['height'], data['size']['width']), dtype=bool)
+                    z = zlib.decompress(base64.b64decode(p['bitmap']['data']))
+                    n = np.fromstring(z, np.uint8)
+                    mask = cv2.imdecode(n, cv2.IMREAD_UNCHANGED)[:, :, 3].astype(bool)
+                    ox = p['bitmap']['origin'][0]
+                    oy = p['bitmap']['origin'][1]
+                    final_mask[oy:oy+mask.shape[0], ox:ox+mask.shape[1]] = mask
+                    final_mask = np.multiply(final_mask.astype(np.uint8), 255)
+
+                    num_labels, labels, stats, _  = cv2.connectedComponentsWithStats(final_mask)
+                    region_areas = []
+
+                    for label in range(1,num_labels):
+                        region_areas.append(stats[label, cv2.CC_STAT_AREA])
+
+                    # procedure to remove the very small masks
+                    if len(region_areas) > 1:
+                        for w in range(len(np.asarray(region_areas))):
+                            region_area = np.asarray(region_areas)[w]
+                            if region_area < 50:
+                                final_mask = np.where(labels==(w+1), 0, final_mask)
+
+                    contours, _ = cv2.findContours(final_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    for cnt in range(len(contours)):
+                        contour = contours[cnt]
+                        contour = contour.reshape(contour.shape[0], contour.shape[-1])
+                        points = []
+                        for h in range(len(contour)):
+                            points.append(int(contour[h][0]))
+                            points.append(int(contour[h][1]))
+                        masks[fill_id].append(points)
+
+            crowd_ids[fill_id] = 0
+            status = "successful"
+        else:
+            status = "unsuccessful"
+
+        fill_id += 1
+
+    return category_ids, masks, crowd_ids, status
+
+
 def bounding_box(masks):
     areas = []
     boxes = []
@@ -556,6 +634,11 @@ def create_json(rootdir, imgdir, images, classes, name):
         if os.path.exists(os.path.join(imgdir, bn + ".json")):
             file_is_json = True
             annot_filename = os.path.join(imgdir, bn + ".json")
+
+        ## supervisely annotation files include the file extension of the image
+        if os.path.exists(os.path.join(imgdir, imgname + ".json")):
+            file_is_json = True
+            annot_filename = os.path.join(imgdir, imgname + ".json")
             
         if os.path.exists(os.path.join(imgdir, bn + ".xml")):
             file_is_xml = True
@@ -577,6 +660,21 @@ def create_json(rootdir, imgdir, images, classes, name):
                         if len(data['annotations']) > 0:
                             annot_format = 'darwin'
                             write = True
+
+                    ## supervisely               
+                    if 'objects' in data:
+                        if len(data['objects']) > 0:
+                            bitmaps = np.zeros(len(data['objects']), dtype=bool)
+                            for ob in range(len(data['objects'])):
+                                obj = data['objects'][ob]
+                                if obj['geometryType'] == "bitmap":
+                                    bitmaps[ob] = True
+
+                        if all(bitmaps): 
+                            annot_format = 'supervisely'
+                            write = True
+                        else:
+                            logger.error("Only bitmap-annotations are supported for Supervisely")
                 except:
                     continue
 
@@ -615,6 +713,9 @@ def create_json(rootdir, imgdir, images, classes, name):
             if annot_format == 'cvat':
                 category_ids, masks, crowd_ids, status = process_cvat_xml(annot_filename, classes)
 
+            if annot_format == 'supervisely':
+                category_ids, masks, crowd_ids, status = process_supervisely_json(annot_filename, classes)
+
             areas, boxes = bounding_box(masks)
             img_vis = visualize(img, category_ids, masks, boxes, classes)
 
@@ -645,7 +746,9 @@ def highlight_missing_annotations(annot_folder, cur_annot_diff):
     rename_xml_files(annot_folder)
     images, annotations = list_files(annot_folder)
     img_basenames = [os.path.splitext(img)[0] for img in images]
-    annotation_basenames = [os.path.splitext(annot)[0] for annot in annotations]
+    
+    ## supervisely puts the json extension behind the image extension
+    annotation_basenames = [os.path.splitext(os.path.splitext(annot)[0])[0] if os.path.splitext(annot)[0].lower().endswith(supported_cv2_formats) else os.path.splitext(annot)[0] for annot in annotations]
     
     diff_img_annot = []
     for c in range(len(img_basenames)):
@@ -665,13 +768,15 @@ def highlight_missing_annotations(annot_folder, cur_annot_diff):
     return diff_img_annot, cur_annot_diff
     
 
-def check_json_presence(imgdir, dataset, name, cfg=[], all_classes=[], pre_annotate=False, export_format=[]):
+def check_json_presence(imgdir, dataset, name, cfg=[], all_classes=[], auto_annotate=False, export_format=[], meta_json=[]):
     print("")
     print("Checking {:s} annotations...".format(name))
     rename_xml_files(imgdir)
     all_images, annotations = list_files(imgdir)
     img_basenames = [os.path.splitext(img)[0] for img in dataset]
-    annotation_basenames = [os.path.splitext(annot)[0] for annot in annotations]
+
+    ## supervisely puts the json extension behind the image extension
+    annotation_basenames = [os.path.splitext(os.path.splitext(annot)[0])[0] if os.path.splitext(annot)[0].lower().endswith(supported_cv2_formats) else os.path.splitext(annot)[0] for annot in annotations]
     
     diff_img_annot = []
     for c in range(len(img_basenames)):
@@ -704,7 +809,7 @@ def check_json_presence(imgdir, dataset, name, cfg=[], all_classes=[], pre_annot
             shutil.copyfile(os.path.join(imgdir, image_copy), os.path.join(annot_folder, image_copy))
 
     ## check whether all images have been annotated in the "annotate" subdirectory
-    if not pre_annotate:
+    if not auto_annotate:
         while len(diff_img_annot) > 0:
             diff_img_annot, cur_annot_diff = highlight_missing_annotations(annot_folder, cur_annot_diff)
 
@@ -737,6 +842,8 @@ def check_json_presence(imgdir, dataset, name, cfg=[], all_classes=[], pre_annot
                     write_labelme_annotations(annot_folder, basename, class_names, masks, height, width)
                 elif export_format == 'cvat':
                     write_cvat_annotations(annot_folder, basename, class_names, masks, height, width)
+                elif export_format == 'supervisely':
+                    write_supervisely_annotations(annot_folder, basename, class_names, masks, height, width, meta_json)
                 else:
                     logger.error("unsupported export_format in the maskAL.yaml file")
                     sys.exit("Closing application")
@@ -758,7 +865,7 @@ def check_json_presence(imgdir, dataset, name, cfg=[], all_classes=[], pre_annot
         ## remove the annotation-folder again
         annot_folder_present = os.path.isdir(annot_folder)
         if annot_folder_present:
-            time.sleep(1)
+            time.sleep(3)
             shutil.rmtree(annot_folder)
 
 
@@ -933,6 +1040,73 @@ def write_cvat_annotations(write_dir, basename, class_names, masks, height, widt
             tree.write(os.path.join(write_dir, xmln))
 
 
+def write_supervisely_annotations(write_dir, basename, class_names, masks, height, width, meta_json):
+    with open(meta_json, 'r') as json_file:
+        data = json.load(json_file)
+
+    masks = masks.astype(np.uint8)
+
+    if masks.any():
+        writedata = {}
+        writedata['description'] = ""
+        writedata['tags'] = []
+        writedata['size'] = {"height": height, "width": width}
+        writedata['objects'] = []
+
+        md, mh, mw = masks.shape
+        maskstransposed = masks.transpose(1,2,0) # transform the mask in the same format as the input image array (h,w,num_dets)
+        useful_masks = False
+
+        for i in range (maskstransposed.shape[-1]):
+            masksel = maskstransposed[:,:,i] # select the individual masks
+            class_name = class_names[i]
+
+            for cn in range(len(data['classes'])):
+                meta_class_name = data['classes'][cn]['title']
+                if class_name == meta_class_name:
+                    class_id = int(data['classes'][cn]['id'])
+
+            contours, _ = cv2.findContours((masksel*255).astype(np.uint8),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+            cnt = np.concatenate(contours)
+            xx,yy,w,h = cv2.boundingRect(cnt)
+
+            time = datetime.datetime.now()
+            time_str = str(time)[:-3].replace(' ','T') + "Z"
+               
+            if cv2.contourArea(cnt) > 50:
+                useful_masks = True
+                
+                ## https://legacy.docs.supervise.ly/ann_format/
+                maskclip = masksel[yy:yy+h, xx:xx+w]
+                img_pil = Image.fromarray(np.array(maskclip, dtype=np.uint8))
+                img_pil.putpalette([0,0,0,255,255,255])
+                bytes_io = io.BytesIO()
+                img_pil.save(bytes_io, format='PNG', transparency=0, optimize=0)
+                bytes = bytes_io.getvalue()
+                bitmap = base64.b64encode(zlib.compress(bytes)).decode('utf-8')
+
+                writedata['objects'].append({
+                    'id': i+1,
+                    'classId': class_id,
+                    'description': "", 
+                    'geometryType': "bitmap",
+                    'labelerLogin': "auto_annotate",
+                    'createdAt': time_str,
+                    'updatedAt': time_str,
+                    'tags': [],
+                    'classTitle': class_name,
+                    'bitmap': {'data': bitmap, 'origin': []}
+                })
+
+                writedata['objects'][-1]['bitmap']['origin'].append(xx)
+                writedata['objects'][-1]['bitmap']['origin'].append(yy)
+
+        jn = basename +'.json'
+        if useful_masks:
+            with open(os.path.join(write_dir, jn), 'w') as outfile:
+                json.dump(writedata, outfile)
+
+
 ## the function below is heavily inspired by the function "repeat_factors_from_category_frequency" in maskAL/detectron2/data/samplers/distributed_sampler.py
 def calculate_repeat_threshold(config, dataset_dicts_train):
     images_with_class_annotations = np.zeros(len(config['classes'])).astype(np.int16)
@@ -1029,14 +1203,14 @@ def prepare_complete_dataset(rootdir, classes, traindir, valdir, testdir):
         sys.exit("Closing application")            
 
 
-def update_train_dataset(cfg, rootdir, imgdir, classes, train_list, pre_annotate, export_format):
+def update_train_dataset(cfg, rootdir, imgdir, classes, train_list, auto_annotate, export_format, meta_json):
     try:
         rename_xml_files(imgdir)
         images, annotations = list_files(imgdir)
         print("{:d} images found!".format(len(images)))
         print("{:d} annotations found!".format(len(annotations)))
 
-        check_json_presence(imgdir, train_list, "train", cfg, classes, pre_annotate, export_format)
+        check_json_presence(imgdir, train_list, "train", cfg, classes, auto_annotate, export_format, meta_json)
         print("Converting annotations...")
         create_json(rootdir, imgdir, train_list, classes, "train")
     except:

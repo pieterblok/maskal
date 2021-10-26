@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-09-21 16:57:08
+# @Last Modified time: 2021-10-26 17:59:06
 
 ## Active learning with Mask R-CNN
 
@@ -384,9 +384,9 @@ def Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder
 
     cfg.OUTPUT_DIR = weightsfolder
 
-    try:
+    if os.path.isfile(os.path.join(cfg.OUTPUT_DIR, "best_model_{:s}.pth".format(str(iter).zfill(3)))):
         cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "best_model_{:s}.pth".format(str(iter).zfill(3)))
-    except:
+    else:
         cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")
         
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = config['confidence_threshold']   # set the testing threshold for this model
@@ -433,21 +433,22 @@ def uncertainty_pooling(pool_list, pool_size, cfg, config, max_entropy, mcd_iter
         ## find the images from the pool_list the algorithm is most uncertain about
         for d in tqdm(range(len(pool_list))):
             filename = pool_list[d]
-            img = cv2.imread(os.path.join(config['traindir'], filename))
-            width, height = img.shape[:-1]
-            outputs = predictor(img)
+            if os.path.isfile(os.path.join(config['traindir'], filename)):
+                img = cv2.imread(os.path.join(config['traindir'], filename))
+                width, height = img.shape[:-1]
+                outputs = predictor(img)
 
-            obs = observations(outputs, config['iou_thres'])
-            img_uncertainty = uncertainty(obs, mcd_iterations, max_entropy, width, height, device, mode) ## reduce the iterations when facing a "CUDA out of memory" error
+                obs = observations(outputs, config['iou_thres'])
+                img_uncertainty = uncertainty(obs, mcd_iterations, max_entropy, width, height, device, mode) ## reduce the iterations when facing a "CUDA out of memory" error
 
-            if not np.isnan(img_uncertainty):
-                if len(pool) < pool_size:
-                    pool[filename] = float(img_uncertainty)
-                else:
-                    max_id, max_val = max(pool.items(), key=operator.itemgetter(1))
-                    if float(img_uncertainty) < max_val:
-                        del pool[max_id]
+                if not np.isnan(img_uncertainty):
+                    if len(pool) < pool_size:
                         pool[filename] = float(img_uncertainty)
+                    else:
+                        max_id, max_val = max(pool.items(), key=operator.itemgetter(1))
+                        if float(img_uncertainty) < max_val:
+                            del pool[max_id]
+                            pool[filename] = float(img_uncertainty)
 
         sorted_pool = sorted(pool.items(), key=operator.itemgetter(1))
         pool = {}
@@ -474,21 +475,22 @@ def certainty_pooling(pool_list, pool_size, cfg, config, max_entropy, mcd_iterat
         ## find the images from the pool_list the algorithm is most uncertain about
         for d in tqdm(range(len(pool_list))):
             filename = pool_list[d]
-            img = cv2.imread(os.path.join(config['traindir'], filename))
-            width, height = img.shape[:-1]
-            outputs = predictor(img)
+            if os.path.isfile(os.path.join(config['traindir'], filename)):
+                img = cv2.imread(os.path.join(config['traindir'], filename))
+                width, height = img.shape[:-1]
+                outputs = predictor(img)
 
-            obs = observations(outputs, config['iou_thres'])
-            img_uncertainty = uncertainty(obs, mcd_iterations, max_entropy, width, height, device, mode) ## reduce the iterations when facing a "CUDA out of memory" error
+                obs = observations(outputs, config['iou_thres'])
+                img_uncertainty = uncertainty(obs, mcd_iterations, max_entropy, width, height, device, mode) ## reduce the iterations when facing a "CUDA out of memory" error
 
-            if not np.isnan(img_uncertainty):
-                if len(pool) < pool_size:
-                    pool[filename] = float(img_uncertainty)
-                else:
-                    min_id, min_val = min(pool.items(), key=operator.itemgetter(1))
-                    if float(img_uncertainty) > min_val:
-                        del pool[min_id]
+                if not np.isnan(img_uncertainty):
+                    if len(pool) < pool_size:
                         pool[filename] = float(img_uncertainty)
+                    else:
+                        min_id, min_val = min(pool.items(), key=operator.itemgetter(1))
+                        if float(img_uncertainty) > min_val:
+                            del pool[min_id]
+                            pool[filename] = float(img_uncertainty)
 
         sorted_pool = sorted(pool.items(), key=operator.itemgetter(1))
         pool = {}
@@ -542,7 +544,7 @@ if __name__ == "__main__":
             prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
         else:
             initial_train_names = get_initial_train_names(config)
-            update_train_dataset(config['dataroot'], config['traindir'], config['classes'], initial_train_names)
+            update_train_dataset([], config['dataroot'], config['traindir'], config['classes'], initial_train_names, False, [], [])
             
         if config['duplicate_initial_model']:
             ## train Mask R-CNN on the initial-dataset and duplicate the results on the other strategies
@@ -579,7 +581,7 @@ if __name__ == "__main__":
                     cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder, csv_name, 0, init=True)
                 else:
                     initial_train_names = get_initial_train_names(config)
-                    update_train_dataset(config['dataroot'], config['traindir'], config['classes'], initial_train_names)
+                    update_train_dataset(cfg, config['dataroot'], config['traindir'], config['classes'], initial_train_names, config['auto_annotate'], config['export_format'], config['supervisely_meta_json'])
                     cfg, dataset_dicts_train, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, 0, 0, dropout_probability, init=False)
                     cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder, csv_name, 0, init=False)
                 train_names = get_train_names(dataset_dicts_train, config['traindir'])
@@ -603,7 +605,7 @@ if __name__ == "__main__":
 
                     ## update the training list and retrain the algorithm
                     train_list = train_names + list(pool.keys())
-                    update_train_dataset(cfg, config['dataroot'], config['traindir'], config['classes'], train_list, config['auto_annotate'], config['export_format'])
+                    update_train_dataset(cfg, config['dataroot'], config['traindir'], config['classes'], train_list, config['auto_annotate'], config['export_format'], config['supervisely_meta_json'])
                     cfg, dataset_dicts_train, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, l+1, val_value, dropout_probability, init=False)
 
                     ## evaluate and write the pooled image-names to a txt-file

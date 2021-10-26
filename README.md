@@ -11,11 +11,11 @@ Active learning automatically selects the most-informative images to annotate an
 3. Annotate the most-informative images, and then retrain the algorithm on the most informative-images
 4. Repeat step 1-3 until the desired performance is reached (or when you are tired of doing annotations) <br/><br/>
 
-The figure below shows the potential of active learning on our dataset. The active learning reached a similar performance after sampling 1100 images as the random image sampling after 2500 images, indicating that 1400 annotations could have been saved (see the black dashed line):
+The figure below shows the performance gain of the active learning on our dataset. The active learning achieved a similar performance after sampling 900 images as the random sampling achieved after 2300 images, indicating that 1400 annotations could have been saved (see the black dashed line):
 
 ![maskAL_graph](./demo/maskAL_vs_random.png?raw=true)
 
-## maskAL installation
+## Installation
 See [INSTALL.md](INSTALL.md)
 <br/> <br/>
 
@@ -57,7 +57,8 @@ Change the following settings in the maskAL.yaml file: <br/>
 | pool_size	 	| The number of selected images from the traindir when doing the active learning sampling (default value: 200)				|
 | loops		 	| The number of active learning sampling iterations (default value: 5)									|
 | auto_annotate	 	| Set this to **True** when you want the model to make predictions on the unlabelled images to further reduce annotation time 		|
-| export_format	 	| When auto_annotate is activated: specifiy the export-format of the annotations (currently supported formats: **'labelme'**, **'cvat'**)	|
+| export_format	 	| When auto_annotate is activated: specify the export-format of the annotations (currently supported formats: **'labelme'**, **'cvat'**, **'supervisely'**)																		|
+| supervisely_meta_json| When **supervisely** auto_annotate is activated: specify the file location of the **meta.json** for supervisely export		|
 <br/>
 
 Description of the other settings in the maskAL.yaml file: [MISC_SETTINGS.md](MISC_SETTINGS.md)
@@ -65,6 +66,24 @@ Description of the other settings in the maskAL.yaml file: [MISC_SETTINGS.md](MI
 
 Please refer to the folder **active_learning/config** for more setting-files. 
 <br/> <br/>
+
+## Other software scripts
+Use a trained model to auto-annotate unlabelled images: **auto_annotate.py** <br/>
+
+| Argument       	| Description           														|
+| ----------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| --img_dir	        | The file directory where the unlabelled images are stored										|
+| --network_config	| Configuration of the backbone of the network												|
+| --classes	 	| The names of the classes of the annotated instances											|
+| --conf_thres	 	| Confidence threshold of the CNN to do the image analysis										|
+| --nms_thres	 	| Non-maximum suppression threshold of the CNN to do the image analysis									|
+| --weights_file 	| Weight-file (.pth) of the trained CNN													|
+| --export_format	| Specifiy the export-format of the annotations (currently supported formats: **'labelme'**, **'cvat'**, **'supervisely'**)		|
+| --supervisely_meta_json| The file location of the **meta.json** for supervisely export									|
+<br/>
+
+**Example syntax (auto_annotate.py):**
+<br/> python auto_annotate.py --img_dir datasets/train --network_config COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml --classes healthy damaged matured cateye headrot --conf_thres 0.5 --nms_thres 0.2 --weights_file weights/broccoli/model_final.pth --export_format supervisely --supervisely_meta_json datasets/meta.json <br/> <br/>
 
 ## Troubleshooting
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
@@ -78,7 +97,7 @@ Please refer to our research article for more information or cross-referencing:
 Our software was forked from Detectron2 (https://github.com/facebookresearch/detectron2). As such, the software will be released under the [Apache 2.0 license](LICENSE). <br/> <br/>
 
 ## Acknowledgments
-Two of our software methods are inspired by RovelMan's software: <br/>
+Two software methods were inspired by the software of RovelMan: <br/>
 https://github.com/RovelMan/active-learning-framework<br/> <br/>
 
 ## Contact

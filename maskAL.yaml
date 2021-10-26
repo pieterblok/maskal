@@ -37,7 +37,7 @@ repeat_factor_smallest_class: 1.0
 
 # evaluation-parameters
 confidence_threshold: 0.5
-nms_threshold: 0.3
+nms_threshold: 0.2
 
 # active-learning sampling
 experiment_name: 'exp1'
@@ -55,3 +55,4 @@ iou_thres: 0.5
 resume: False
 auto_annotate: True
 export_format: labelme
+supervisely_meta_json: "./datasets/meta.json"

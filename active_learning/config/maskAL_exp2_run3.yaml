@@ -55,3 +55,4 @@ iou_thres: 0.5
 resume: False
 auto_annotate: False
 export_format: labelme
+supervisely_meta_json: "./datasets/meta.json"

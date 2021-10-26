@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-10-08 10:20:39
+# @Last Modified time: 2021-10-26 17:58:38
 
 ## Use a trained model to auto-annotate unlabelled images
 
@@ -24,7 +24,7 @@ from detectron2.modeling import build_model
 from detectron2.checkpoint import DetectionCheckpointer
 
 ## libraries for preparing the datasets
-from active_learning.sampling import list_files, write_cvat_annotations, write_labelme_annotations
+from active_learning.sampling import list_files, write_cvat_annotations, write_labelme_annotations, write_supervisely_annotations
 
 
 ## function to visualize the output of Mask R-CNN
@@ -102,7 +102,8 @@ if __name__ == "__main__":
     parser.add_argument('--conf_thres', type=float, default=0.5, help='confidence threshold for the Mask R-CNN inference')
     parser.add_argument('--nms_thres', type=float, default=0.2, help='non-maximum suppression threshold for the Mask R-CNN inference')
     parser.add_argument('--weights_file', type=str, default=[], help='weight-file (.pth)')
-    parser.add_argument('--export_format', default='cvat', help='Choose either "labelme" or "cvat"')
+    parser.add_argument('--export_format', type=str, default='cvat', help='Choose either "labelme", "cvat" or "supervisely"')
+    parser.add_argument('--supervisely_meta_json', type=str, default="", help='the file location of the meta.json for supervisely export')
 
     ## Load the args_parser and initialize some variables
     opt = parser.parse_args()
@@ -153,4 +154,7 @@ if __name__ == "__main__":
             write_cvat_annotations(opt.img_dir, basename, class_names, masks, height, width)
         
         if opt.export_format == "labelme":
-            writedata = write_labelme_annotations(basename, class_names, masks, height, width)
+            write_labelme_annotations(opt.img_dir, basename, class_names, masks, height, width)
+
+        if opt.export_format == "supervisely":
+            write_supervisely_annotations(opt.img_dir, basename, class_names, masks, height, width, opt.supervisely_meta_json)
