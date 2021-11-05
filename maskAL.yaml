@@ -14,8 +14,6 @@ testdir: "./datasets/test"
 cuda_visible_devices: '0'
 classes: ['healthy', 'damaged', 'matured', 'cateye', 'headrot']
 transfer_learning_on_previous_models: True
-train_complete_trainset: False
-duplicate_initial_model: True
 learning_rate: 0.01
 warmup_iterations: 500
 train_iterations_base: 2500
@@ -52,7 +50,6 @@ mcd_iterations: 10
 dropout_method: 'head'
 al_batch_size: 1
 iou_thres: 0.5
-resume: False
 auto_annotate: True
 export_format: labelme
 supervisely_meta_json: "./datasets/meta.json"

@@ -3,8 +3,6 @@ The following settings can probably stay unchanged: <br/> <br/>
 | Setting        			| Description        													|
 | --------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
 | transfer_learning_on_previous_models	| Whether to use the weight-files of the previous trainings for transfer-learning					|
-| train_complete_trainset		| Whether to train Mask R-CNN on the entire dataset of the traindir							|
-| duplicate_initial_model		| When comparing different settings, you might want to duplicate the trained model of the initial training set 		|
 | warmup_iterations			| The number of warmup-iterations that can be used to stabilize the training process 			 		|
 | train_iterations_base			| The number of training iterations to start the training with (this number of training iterations is used when the total number of training images is below the value of **step_image_number**)								 			 		|
 | train_iterations_step_size		| When the number of training images exceeds the **step_image_number**, then this number of iterations is added to the **train_iterations_base**																	|
@@ -29,5 +27,4 @@ The following settings can probably stay unchanged: <br/> <br/>
 | dropout_method			| Use **'head'** to significantly speed up the sampling process. Use **'complete'** to do the image inference through the entire network (not recommended) 																		|
 | al_batch_size				| Only when the **'complete'** option is used for the **dropout_method**. Image batch-size to do the uncertainty calculation|
 | iou_thres				| Intersection of Union threshold to cluster the different instance segmentations into observations for the uncertainty calculation																			|
-| resume				| Resume the training process when errors occur. We don't expect that you'll need this, therefore **False**		|
 <br/>

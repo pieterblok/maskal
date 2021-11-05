@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-10-26 17:59:06
+# @Last Modified time: 2021-11-05 16:54:42
 
 ## Active learning with Mask R-CNN
 
@@ -99,53 +99,38 @@ def check_direxcist(dir):
 
 
 def init_folders_and_files(config):
-    if not config['train_complete_trainset']:
-        weightsfolders = []
-        resultsfolders = []
-        csv_names = []
+    weightsfolders = []
+    resultsfolders = []
+    csv_names = []
 
-        counts = Counter(config['strategies'])
-        counts = list(counts.values())
-        duplicates = any(x > 1 for x in counts)
-        hybrid_count = 0
-            
-        for s, (strategy, mode, dropout_probability, mcd_iterations, pool_size) in enumerate(zip(config['strategies'], config['mode'], config['dropout_probability'], config['mcd_iterations'], config['pool_size'])):
-            if duplicates:
-                if isinstance(pool_size, list):
-                    hybrid_count += 1
-                    pool_size = "hybrid{:02d}".format(hybrid_count)
-                folder_name = strategy + "_" + mode + "_" + "{:.2f}".format(dropout_probability) + "_" + str(mcd_iterations) + "_" + str(pool_size)
-            else:
-                folder_name = strategy
-
-            weightsfolder = os.path.join(config['weightsroot'], config['experiment_name'], folder_name)            
-            check_direxcist(weightsfolder)
-            weightsfolders.append(weightsfolder)
-            
-            resultsfolder = os.path.join(config['resultsroot'], config['experiment_name'], folder_name)
-            check_direxcist(resultsfolder)
-            resultsfolders.append(resultsfolder)
-
-            segm_strings = [c.replace(c, 'mAP-' + c) for c in config['classes']]
-            write_strings = ['train_size', 'mAP'] + segm_strings
-            csv_name = folder_name + '.csv'
-            csv_names.append(csv_name)
-
-            with open(os.path.join(resultsfolder, csv_name), 'w', newline='') as csvfile:
-                csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
-                csvwriter.writerow(write_strings)
-    else:
-        weightsfolders = os.path.join(config['weightsroot'], config['experiment_name'])            
-        check_direxcist(weightsfolders)
+    counts = Counter(config['strategies'])
+    counts = list(counts.values())
+    duplicates = any(x > 1 for x in counts)
+    hybrid_count = 0
         
-        resultsfolders = os.path.join(config['resultsroot'], config['experiment_name'])
-        check_direxcist(resultsfolders)
+    for s, (strategy, mode, dropout_probability, mcd_iterations, pool_size) in enumerate(zip(config['strategies'], config['mode'], config['dropout_probability'], config['mcd_iterations'], config['pool_size'])):
+        if duplicates:
+            if isinstance(pool_size, list):
+                hybrid_count += 1
+                pool_size = "hybrid{:02d}".format(hybrid_count)
+            folder_name = strategy + "_" + mode + "_" + "{:.2f}".format(dropout_probability) + "_" + str(mcd_iterations) + "_" + str(pool_size)
+        else:
+            folder_name = strategy
+
+        weightsfolder = os.path.join(config['weightsroot'], config['experiment_name'], folder_name)            
+        check_direxcist(weightsfolder)
+        weightsfolders.append(weightsfolder)
+        
+        resultsfolder = os.path.join(config['resultsroot'], config['experiment_name'], folder_name)
+        check_direxcist(resultsfolder)
+        resultsfolders.append(resultsfolder)
 
         segm_strings = [c.replace(c, 'mAP-' + c) for c in config['classes']]
         write_strings = ['train_size', 'mAP'] + segm_strings
-        csv_names = os.path.basename(config['experiment_name']) + '.csv'
+        csv_name = folder_name + '.csv'
+        csv_names.append(csv_name)
 
-        with open(os.path.join(resultsfolders, csv_names), 'w', newline='') as csvfile:
+        with open(os.path.join(resultsfolder, csv_name), 'w', newline='') as csvfile:
             csvwriter = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
             csvwriter.writerow(write_strings)
 
@@ -537,93 +522,52 @@ if __name__ == "__main__":
     gpu_num = len(config['cuda_visible_devices'])
     check_direxcist(config['dataroot'])
 
-    if not config['train_complete_trainset']:
-        weightsfolders, resultsfolders, csv_names = init_folders_and_files(config)
-        if not config['resume']:
-            remove_initial_training_set(config['dataroot'])
-            prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
+    weightsfolders, resultsfolders, csv_names = init_folders_and_files(config)
+    remove_initial_training_set(config['dataroot'])
+    prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
+    max_entropy = calculate_max_entropy(config['classes'])
+
+    ## active-learning
+    for i, (strategy, equal_pool_size, pool_size, mcd_iterations, mode, dropout_probability, loops, weightsfolder, resultsfolder, csv_name) in enumerate(zip(config['strategies'], config['equal_pool_size'], config['pool_size'], config['mcd_iterations'], config['mode'], config['dropout_probability'], config['loops'], weightsfolders, resultsfolders, csv_names)):
+        ## train and evaluate Mask R-CNN on the initial dataset
+        if i == 0:
+            cfg, dataset_dicts_train, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, 0, 0, dropout_probability, init=True)
+            cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder, csv_name, 0, init=True)
         else:
             initial_train_names = get_initial_train_names(config)
-            update_train_dataset([], config['dataroot'], config['traindir'], config['classes'], initial_train_names, False, [], [])
-            
-        if config['duplicate_initial_model']:
-            ## train Mask R-CNN on the initial-dataset and duplicate the results on the other strategies
-            if not config['resume']:
-                cfg, dataset_dicts_train_init, val_value_init = Train_MaskRCNN(config, weightsfolders[0], gpu_num, 0, 0, config['dropout_probability'][0], init=True)
-                store_initial_files(cfg, config, dataset_dicts_train_init, val_value_init, weightsfolders)
-                copy_initial_weight_file(weightsfolders[0], weightsfolders, 0)
-            else:
-                cfg, dataset_dicts_train_init, val_value_init = load_initial_files(config, weightsfolders)
-
-            ## do the evaluation with the same initial-weight-files
-            for e, (weightsfolder, resultsfolder, csv_name) in enumerate(zip(weightsfolders, resultsfolders, csv_names)):
-                if e == 0:
-                    cfg_init = Eval_MaskRCNN(cfg, config, dataset_dicts_train_init, weightsfolder, resultsfolder, csv_name, 0, init=True)
-                else:
-                    cfg_init = Eval_MaskRCNN(cfg, config, dataset_dicts_train_init, weightsfolder, resultsfolder, csv_name, 0, init=False)
-
-                train_names = get_train_names(dataset_dicts_train_init, config['traindir'])
-                write_train_files(train_names, resultsfolder, 0)
-
-        max_entropy = calculate_max_entropy(config['classes'])
-
-        ## active-learning strategies
-        for i, (strategy, equal_pool_size, pool_size, mcd_iterations, mode, dropout_probability, loops, weightsfolder, resultsfolder, csv_name) in enumerate(zip(config['strategies'], config['equal_pool_size'], config['pool_size'], config['mcd_iterations'], config['mode'], config['dropout_probability'], config['loops'], weightsfolders, resultsfolders, csv_names)):
-            if config['duplicate_initial_model']:
-                ## load the initial_cfg to obtain the model-weights and image-names of the initial training
-                cfg = cfg_init 
-                train_names = get_train_names(dataset_dicts_train_init, config['traindir'])
-                val_value = val_value_init
-            else:
-                ## train and evaluate Mask R-CNN on the initial dataset with different settings
-                if i == 0:
-                    cfg, dataset_dicts_train, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, 0, 0, dropout_probability, init=True)
-                    cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder, csv_name, 0, init=True)
-                else:
-                    initial_train_names = get_initial_train_names(config)
-                    update_train_dataset(cfg, config['dataroot'], config['traindir'], config['classes'], initial_train_names, config['auto_annotate'], config['export_format'], config['supervisely_meta_json'])
-                    cfg, dataset_dicts_train, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, 0, 0, dropout_probability, init=False)
-                    cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder, csv_name, 0, init=False)
-                train_names = get_train_names(dataset_dicts_train, config['traindir'])
-                write_train_files(train_names, resultsfolder, 0)
-            
-            if not equal_pool_size:
-                pool_size_list = list(chain.from_iterable([[pool_size[ll]] * loops[ll] for ll in range(len(loops))]))
-                loops = sum(loops)
-            
-            ## do the iterative pooling
-            for l in range(loops):
-                copy_previous_weights(weightsfolder, l+1)
-                pool_list = create_pool_list(config, train_names)
-
-                if not equal_pool_size:
-                    pool_size = pool_size_list[l]
-
-                if strategy + '_pooling' in dir():
-                    ## do the pooling (eval is a python-method that executes a function with a string-input)
-                    pool = eval(strategy + '_pooling(pool_list, pool_size, cfg, config, max_entropy, mcd_iterations, mode)')
-
-                    ## update the training list and retrain the algorithm
-                    train_list = train_names + list(pool.keys())
-                    update_train_dataset(cfg, config['dataroot'], config['traindir'], config['classes'], train_list, config['auto_annotate'], config['export_format'], config['supervisely_meta_json'])
-                    cfg, dataset_dicts_train, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, l+1, val_value, dropout_probability, init=False)
-
-                    ## evaluate and write the pooled image-names to a txt-file
-                    cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder, csv_name, l+1, init=False)
-                    train_names = get_train_names(dataset_dicts_train, config['traindir'])
-                    write_train_files(train_names, resultsfolder, l+1, pool)
-                else:
-                    logger.error(f"The {strategy}-strategy is not defined")
-                    sys.exit("Closing application")
-
-
-    else:
-        ## train the complete train-pool to determine the base-line performance
-        weightsfolder, resultsfolder, csv_name = init_folders_and_files(config)
-        prepare_complete_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'])
-        cfg, dataset_dicts_train, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, 0, 0, 0.5, init=True)
-        cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder, csv_name, 0, init=True)
+            update_train_dataset(cfg, config['dataroot'], config['traindir'], config['classes'], initial_train_names, config['auto_annotate'], config['export_format'], config['supervisely_meta_json'])
+            cfg, dataset_dicts_train, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, 0, 0, dropout_probability, init=False)
+            cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder, csv_name, 0, init=False)
         train_names = get_train_names(dataset_dicts_train, config['traindir'])
         write_train_files(train_names, resultsfolder, 0)
+        
+        if not equal_pool_size:
+            pool_size_list = list(chain.from_iterable([[pool_size[ll]] * loops[ll] for ll in range(len(loops))]))
+            loops = sum(loops)
+        
+        ## do the iterative pooling
+        for l in range(loops):
+            copy_previous_weights(weightsfolder, l+1)
+            pool_list = create_pool_list(config, train_names)
+
+            if not equal_pool_size:
+                pool_size = pool_size_list[l]
+
+            if strategy + '_pooling' in dir():
+                ## do the pooling (eval is a python-method that executes a function with a string-input)
+                pool = eval(strategy + '_pooling(pool_list, pool_size, cfg, config, max_entropy, mcd_iterations, mode)')
+
+                ## update the training list and retrain the algorithm
+                train_list = train_names + list(pool.keys())
+                update_train_dataset(cfg, config['dataroot'], config['traindir'], config['classes'], train_list, config['auto_annotate'], config['export_format'], config['supervisely_meta_json'])
+                cfg, dataset_dicts_train, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, l+1, val_value, dropout_probability, init=False)
+
+                ## evaluate and write the pooled image-names to a txt-file
+                cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder, csv_name, l+1, init=False)
+                train_names = get_train_names(dataset_dicts_train, config['traindir'])
+                write_train_files(train_names, resultsfolder, l+1, pool)
+            else:
+                logger.error(f"The {strategy}-strategy is not defined")
+                sys.exit("Closing application")
 
     logger.info("Active learning is finished!")
