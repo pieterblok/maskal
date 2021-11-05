@@ -1145,7 +1145,7 @@ def calculate_iterations(config, dataset_dicts_train):
     return int(max_iterations), steps
     
 
-def prepare_initial_dataset_randomly(rootdir, imgdir, classes, train_val_test_split, initial_datasize):
+def prepare_all_dataset_randomly(rootdir, imgdir, classes, train_val_test_split, initial_datasize):
     rename_xml_files(imgdir)
     images, annotations = list_files(imgdir)
     print("{:d} images found!".format(len(images)))
@@ -1160,7 +1160,7 @@ def prepare_initial_dataset_randomly(rootdir, imgdir, classes, train_val_test_sp
         create_json(rootdir, imgdir, dataset, classes, name)   
 
 
-def prepare_initial_dataset(rootdir, classes, traindir, valdir, testdir, initial_datasize):
+def prepare_initial_dataset_randomly(rootdir, classes, traindir, valdir, testdir, initial_datasize):
     try:
         for imgdir, name, init_ds in zip([traindir, valdir, testdir], ['train', 'val', 'test'], [initial_datasize, 0, 0]):
             print("")
@@ -1180,6 +1180,28 @@ def prepare_initial_dataset(rootdir, classes, traindir, valdir, testdir, initial
                 write_file(rootdir, images, name)
                 check_json_presence(imgdir, images, name)
                 create_json(rootdir, imgdir, images, classes, name)
+    except:
+        logger.error("Cannot create initial-datasets")
+        sys.exit("Closing application")
+
+
+def prepare_initial_dataset(rootdir, classes, traindir, initial_train_dir, valdir, testdir):
+    try:
+        for i, (imgdir, name) in enumerate(zip([traindir, initial_train_dir, valdir, testdir], ['train', 'initial_train', 'val', 'test'])):
+            print("")
+            print("Processing {:s}-dataset: {:s}".format(name, imgdir))
+            rename_xml_files(imgdir)
+            images, annotations = list_files(imgdir)
+            print("{:d} images found!".format(len(images)))
+            print("{:d} annotations found!".format(len(annotations)))
+            write_file(rootdir, images, name)
+
+            if i != 0:
+                if "train" in name:
+                    name = "train"
+                check_json_presence(imgdir, images, name)
+                create_json(rootdir, imgdir, images, classes, name)
+
     except:
         logger.error("Cannot create initial-datasets")
         sys.exit("Closing application")

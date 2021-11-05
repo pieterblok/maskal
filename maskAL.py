@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-11-05 16:54:42
+# @Last Modified time: 2021-11-05 18:28:58
 
 ## Active learning with Mask R-CNN
 
@@ -46,7 +46,7 @@ import detectron2.utils.comm as comm
 from active_learning.strategies.dropout import FastRCNNConvFCHeadDropout
 from active_learning.strategies.dropout import FastRCNNOutputLayersDropout
 from active_learning.strategies.dropout import MaskRCNNConvUpsampleHeadDropout
-from active_learning.sampling import prepare_initial_dataset, update_train_dataset, prepare_complete_dataset, calculate_repeat_threshold, calculate_iterations
+from active_learning.sampling import prepare_initial_dataset, prepare_initial_dataset_randomly, update_train_dataset, prepare_complete_dataset, calculate_repeat_threshold, calculate_iterations
 from active_learning.sampling.montecarlo_dropout import MonteCarloDropout, MonteCarloDropoutHead
 from active_learning.sampling import observations
 from active_learning.heuristics import uncertainty
@@ -58,6 +58,10 @@ def imshow(img):
     plt.imshow(img[:, :, [2, 1, 0]])
     plt.axis("off")
     plt.show()
+
+
+supported_cv2_formats = (".bmp", ".dib", ".jpeg", ".jpg", ".jpe", ".jp2", ".png", ".pbm", ".pgm", ".ppm", ".sr", ".ras", ".tiff", ".tif")
+supported_annotation_formats = (".json", ".xml")
 
 
 ## initialize the logging
@@ -211,6 +215,18 @@ def write_train_files(train_names, writefolder, iteration, pool={}):
             else:
                 filehandle.write("{:s}, NaN\n".format(train_name))
     filehandle.close()
+
+
+def move_initial_train_dir(initial_train_dir, traindir, export):
+    if export == "images":
+        fileext = supported_cv2_formats
+    elif export == "annotations":
+        fileext = supported_annotation_formats
+
+    all_files = os.listdir(initial_train_dir)
+    for cur_file in all_files:
+        if cur_file.lower().endswith(fileext):
+            copyfile(os.path.join(initial_train_dir, cur_file), os.path.join(traindir, cur_file))
 
 
 def copy_initial_weight_file(read_folder, weightsfolders, iter):
@@ -524,9 +540,15 @@ if __name__ == "__main__":
 
     weightsfolders, resultsfolders, csv_names = init_folders_and_files(config)
     remove_initial_training_set(config['dataroot'])
-    prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
     max_entropy = calculate_max_entropy(config['classes'])
-
+    if config['use_initial_train_dir']:
+        move_initial_train_dir(config['initial_train_dir'], config['traindir'], "images")
+        prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['initial_train_dir'], config['valdir'], config['testdir'])
+        move_initial_train_dir(config['initial_train_dir'], config['traindir'], "annotations")
+    else:
+        prepare_initial_dataset_randomly(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
+        
+        
     ## active-learning
     for i, (strategy, equal_pool_size, pool_size, mcd_iterations, mode, dropout_probability, loops, weightsfolder, resultsfolder, csv_name) in enumerate(zip(config['strategies'], config['equal_pool_size'], config['pool_size'], config['mcd_iterations'], config['mode'], config['dropout_probability'], config['loops'], weightsfolders, resultsfolders, csv_names)):
         ## train and evaluate Mask R-CNN on the initial dataset
