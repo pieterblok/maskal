@@ -6,6 +6,8 @@
 weightsroot: "./weights"
 resultsroot: "./results"
 dataroot: "./datasets"
+use_initial_train_dir: False
+initial_train_dir: "./datasets/initial_train"
 traindir: "./datasets/train"
 valdir: "./datasets/val"
 testdir: "./datasets/test"
