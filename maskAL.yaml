@@ -21,11 +21,11 @@ warmup_iterations: 500
 train_iterations_base: 2500
 train_iterations_step_size: 2500
 step_image_number: 500
-step_ratios: [0.5, 0.8]
 eval_period: 500
 checkpoint_period: 500
 weight_decay: 0.0001
 learning_policy: 'steps_with_decay'
+step_ratios: [0.5, 0.8]
 gamma: 0.1
 train_batch_size: 1
 num_workers: 2
@@ -49,8 +49,6 @@ equal_pool_size: True
 loops: 5
 dropout_probability: 0.25
 mcd_iterations: 10
-dropout_method: 'head'
-al_batch_size: 1
 iou_thres: 0.5
 auto_annotate: True
 export_format: labelme

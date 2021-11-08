@@ -101,7 +101,8 @@ Tested with: Pytorch 1.8.0 & torchvision 0.9.0 (Ubuntu 16.04/18.04 and CUDA 10.1
 - pip install baal 
 - pip install xmltodict 
 - pip install seaborn 
-- pip install statsmodels <br/> <br/>
+- pip install statsmodels 
+- pip install cerberus <br/> <br/>
 
 **2.5) Reboot/restart the computer (sudo reboot)** <br/> <br/>
 

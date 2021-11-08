@@ -45,6 +45,8 @@ Change the following settings in the maskAL.yaml file: <br/>
 | weightsroot	        | The file directory where the weight-files are stored											|
 | resultsroot		| The file directory where the result-files are stored 											|
 | dataroot	 	| The root directory where all image-files are stored											|
+| use_initial_train_dir | Set this to **True** when you start the active-learning from an initial training dataset						|
+| initial_train_dir     | When use_initial_train_dir is activated: the file directory where the initial training images and annotations are stored		|
 | traindir	 	| The file directory where the training images and annotations are stored								|
 | valdir	 	| The file directory where the validation images and annotations are stored								|
 | testdir	 	| The file directory where the test images and annotations are stored									|
@@ -58,7 +60,7 @@ Change the following settings in the maskAL.yaml file: <br/>
 | loops		 	| The number of active learning sampling iterations (default value: 5)									|
 | auto_annotate	 	| Set this to **True** when you want the model to make predictions on the unlabelled images to further reduce annotation time 		|
 | export_format	 	| When auto_annotate is activated: specify the export-format of the annotations (currently supported formats: **'labelme'**, **'cvat'**, **'supervisely'**)																		|
-| supervisely_meta_json| When **supervisely** auto_annotate is activated: specify the file location of the **meta.json** for supervisely export		|
+| supervisely_meta_json| When **supervisely** auto_annotate is activated: specify the file location of the **meta.json** for supervisely export			|
 <br/>
 
 Description of the other settings in the maskAL.yaml file: [MISC_SETTINGS.md](MISC_SETTINGS.md)

@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-11-05 21:53:32
+# @Last Modified time: 2021-11-08 13:45:03
 
 ## Active learning with Mask R-CNN
 
@@ -22,6 +22,7 @@ from itertools import chain
 import pickle
 from collections import OrderedDict, Counter
 from tqdm import tqdm
+from cerberus import Validator
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -71,6 +72,81 @@ logger.setLevel('DEBUG')
 file_handler = logging.StreamHandler()
 formatter = logging.Formatter(log_format)
 file_handler.setFormatter(formatter)
+
+
+def check_config_file(config, config_filename, input_yaml):
+    config_ok = True
+    error_list = {}
+    schema = {}
+    
+    try:
+        with open(input_yaml, 'rb') as file:
+            desired_inputs = yaml.load(file, Loader=yaml.FullLoader)
+    except FileNotFoundError:
+        logger.error(f"Could not find inputs.yaml file")
+        sys.exit("Closing application")
+
+    def check_network_config(field, value, error):
+        if "COCO-InstanceSegmentation" not in value:
+            error(field, "choose a config-file from configs/COCO-InstanceSegmentation")
+
+    threshold_list = ['confidence_threshold', 'nms_threshold', 'dropout_probability', 'iou_thres']
+    for key, value in config.items():
+        for key1, value1 in desired_inputs.items():
+            if key == key1:
+                if key == "network_config":
+                    schema[key] = {'type': value1, 'check_with': check_network_config}
+                elif key == "repeat_factor_smallest_class":
+                    schema[key] = {'type': value1, "min": 1}
+                elif key == "learning_policy":
+                    schema[key] = {'type': value1, 'allowed': ['steps_with_lrs', 'steps_with_decay', 'step', 'cosine_decay', 'exp_decay']}
+                elif key == "train_sampler":
+                    schema[key] = {'type': value1, 'allowed': ['TrainingSampler', 'RepeatFactorTrainingSampler']}
+                elif key == "strategies":
+                    schema[key] = {'type': value1, 'allowed': ['uncertainty', 'certainty', 'random']}
+                elif key == "mode":
+                    schema[key] = {'type': value1, 'allowed': ['mean', 'min']}
+                elif key == "export_format":
+                    schema[key] = {'type': value1, 'allowed': ['labelme', 'cvat', 'supervisely']}
+                elif key in threshold_list:
+                    schema[key] = {'type': value1, "min": 0, "max": 1}
+                else:
+                    schema[key] = {'type': value1}
+
+    known_types = {
+        'integer': int,
+        'float': float,
+        'string': str,
+        'boolean': bool,
+    }
+
+    v = Validator(schema)
+    for key, value in config.items():
+        check = {}
+        if isinstance(value, list):
+            for key1, value1 in desired_inputs.items():
+                if key == key1:
+                    if not all(isinstance(v, known_types[value1[0]]) for v in value):
+                        error_list.update({key: ["not all items are of type: " + str(value1[0])]})
+                    if key == "strategies":
+                        if not all(v in ['uncertainty', 'certainty', 'random'] for v in value):
+                            error_list.update({key: ["choose 1 of these 3 options: 'uncertainty', 'certainty', 'random'"]})
+                    if key == "mode":
+                        if not all(v in ['mean', 'min'] for v in value):
+                            error_list.update({key: ["choose 1 of these 2 options: 'mean', 'min'"]})
+        else:
+            check[key] = value
+            if not v.validate(check):
+                error_list.update(v.errors.copy())
+
+    if error_list:
+        config_ok = False
+        print("")
+        logger.error(f"Errors in the configuration-file: {config_filename}")
+        for key, value in error_list.items():
+            print(f"config['{key}']: {value}")
+    
+    return config_ok
 
 
 def process_config_file(config, ints_to_lists):
@@ -422,12 +498,7 @@ def Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder
 def uncertainty_pooling(pool_list, pool_size, cfg, config, max_entropy, mcd_iterations, mode):
     pool = {}
     cfg.MODEL.ROI_HEADS.SOFTMAXES = True
-
-    if config['dropout_method'] == 'head':
-        predictor = MonteCarloDropoutHead(cfg, mcd_iterations)
-    else:
-        predictor = MonteCarloDropout(cfg, mcd_iterations, config['al_batch_size'])
-
+    predictor = MonteCarloDropoutHead(cfg, mcd_iterations)
     device = cfg.MODEL.DEVICE
 
     if len(pool_list) > 0:
@@ -464,12 +535,7 @@ def uncertainty_pooling(pool_list, pool_size, cfg, config, max_entropy, mcd_iter
 def certainty_pooling(pool_list, pool_size, cfg, config, max_entropy, mcd_iterations, mode):
     pool = {}
     cfg.MODEL.ROI_HEADS.SOFTMAXES = True
-    
-    if config['dropout_method'] == 'head':
-        predictor = MonteCarloDropoutHead(cfg, mcd_iterations)
-    else:
-        predictor = MonteCarloDropout(cfg, mcd_iterations, config['al_batch_size'])
-        
+    predictor = MonteCarloDropoutHead(cfg, mcd_iterations)  
     device = cfg.MODEL.DEVICE
 
     if len(pool_list) > 0:
@@ -532,6 +598,10 @@ if __name__ == "__main__":
     print("Configuration:")
     for key, value in config.items():
         print(key, ':', value)
+
+    config_ok = check_config_file(config, args.config, 'types.yaml')
+    if not config_ok: 
+        sys.exit("Closing application")
 
     config = process_config_file(config, ['strategies', 'mode', 'equal_pool_size', 'pool_size', 'dropout_probability', 'mcd_iterations', 'loops'])
     os.environ["CUDA_VISIBLE_DEVICES"] = config['cuda_visible_devices']

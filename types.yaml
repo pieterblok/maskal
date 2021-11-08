@@ -1,0 +1,59 @@
+# Types to run maskAL
+
+# folders
+weightsroot: 'string'
+resultsroot: 'string'
+dataroot: 'string'
+use_initial_train_dir: 'boolean'
+initial_train_dir: 'string'
+traindir: 'string'
+valdir: 'string'
+testdir: 'string'
+
+# network parameters
+network_config: 'string'
+pretrained_weights: 'string'
+
+# training-parameters
+cuda_visible_devices: 'string'
+classes: ['string', 'list']
+transfer_learning_on_previous_models: 'boolean'
+learning_rate: 'float'
+warmup_iterations: 'integer'
+train_iterations_base: 'integer'
+train_iterations_step_size: 'integer'
+step_image_number: 'integer'
+step_ratios: ['float', 'list']
+eval_period: 'integer'
+checkpoint_period: 'integer'
+weight_decay: 'float'
+learning_policy: 'string'
+gamma: 'float'
+train_batch_size: 'integer'
+num_workers: 'integer'
+
+# train-sampler
+train_sampler: 'string'
+minority_classes: ['string', 'list']
+repeat_factor_smallest_class: 'float'
+
+# evaluation-parameters
+confidence_threshold: 'float'
+nms_threshold: 'float'
+
+# active-learning sampling
+experiment_name: 'string'
+strategies: ['string', 'list']
+mode: ['string', 'list']
+initial_datasize: 'integer'
+pool_size: ['integer', 'list']
+equal_pool_size: 'boolean'
+loops: 'integer'
+dropout_probability: 'float'
+mcd_iterations: 'integer'
+dropout_method: 'string'
+al_batch_size: 'integer'
+iou_thres: 'float'
+auto_annotate: 'boolean'
+export_format: 'string'
+supervisely_meta_json: 'string'
