@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-22 09:43:07
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-06-22 10:56:13
+# @Last Modified time: 2021-11-08 15:09:29
 
 #!/usr/bin/env python
 
@@ -25,7 +25,7 @@ from detectron2.utils.events import get_event_storage
 from detectron2.utils.registry import Registry
 
 ## these specific libraries are needed to alter the network architecture
-from detectron2.modeling.roi_heads import ROI_HEADS_REGISTRY, StandardROIHeads
+from detectron2.modeling.roi_heads import ROI_HEADS_REGISTRY, StandardROIHeads, Res5ROIHeads
 from detectron2.modeling.roi_heads.box_head import ROI_BOX_HEAD_REGISTRY
 from detectron2.modeling.roi_heads.fast_rcnn import fast_rcnn_inference, _log_classification_stats
 from detectron2.modeling.roi_heads.mask_head import ROI_MASK_HEAD_REGISTRY, BaseMaskRCNNHead
@@ -430,6 +430,13 @@ class FastRCNNOutputLayersDropout(nn.Module):
         probs = F.softmax(scores, dim=-1)
         return probs.split(num_inst_per_image, dim=0)
 
+
+
+@ROI_HEADS_REGISTRY.register()
+class Res5ROIHeadsDropout(Res5ROIHeads):
+    def __init__(self, cfg, input_shape):
+        super().__init__(cfg, input_shape, box_predictor=FastRCNNOutputLayersDropout(cfg, 2048))
+    
 
 
 @ROI_HEADS_REGISTRY.register()

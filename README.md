@@ -50,6 +50,8 @@ Change the following settings in the maskAL.yaml file: <br/>
 | traindir	 	| The file directory where the training images and annotations are stored								|
 | valdir	 	| The file directory where the validation images and annotations are stored								|
 | testdir	 	| The file directory where the test images and annotations are stored									|
+| network_config	| The Mask R-CNN configuration-file (.yaml) file in the folder './configs')								|
+| pretrained_weights	| The pretrained weights to start the active-learning. Either specified by the config-file (.yaml) or a custom weights-file (.pth or .pkl)|
 | cuda_visible_devices 	| The identifiers of the CUDA device(s) you want to use for training and sampling							|
 | classes	 	| The names of the classes of the annotated instances											|
 | learning_rate	 	| The learning-rate to train Mask R-CNN (default value: 0.01)										|

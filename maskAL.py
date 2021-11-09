@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-11-08 13:45:03
+# @Last Modified time: 2021-11-08 22:12:27
 
 ## Active learning with Mask R-CNN
 
@@ -44,12 +44,9 @@ from detectron2.engine.hooks import HookBase
 import detectron2.utils.comm as comm
 
 ## libraries that are specific for dropout training
-from active_learning.strategies.dropout import FastRCNNConvFCHeadDropout
-from active_learning.strategies.dropout import FastRCNNOutputLayersDropout
-from active_learning.strategies.dropout import MaskRCNNConvUpsampleHeadDropout
-from active_learning.sampling import prepare_initial_dataset, prepare_initial_dataset_randomly, update_train_dataset, prepare_complete_dataset, calculate_repeat_threshold, calculate_iterations
+from active_learning.strategies.dropout import FastRCNNConvFCHeadDropout, FastRCNNOutputLayersDropout, MaskRCNNConvUpsampleHeadDropout, Res5ROIHeadsDropout
+from active_learning.sampling import observations, prepare_initial_dataset, prepare_initial_dataset_randomly, update_train_dataset, prepare_complete_dataset, calculate_repeat_threshold, calculate_iterations
 from active_learning.sampling.montecarlo_dropout import MonteCarloDropout, MonteCarloDropoutHead
-from active_learning.sampling import observations
 from active_learning.heuristics import uncertainty
 
 import matplotlib.pyplot as plt
@@ -87,8 +84,12 @@ def check_config_file(config, config_filename, input_yaml):
         sys.exit("Closing application")
 
     def check_network_config(field, value, error):
-        if "COCO-InstanceSegmentation" not in value:
-            error(field, "choose a config-file from configs/COCO-InstanceSegmentation")
+        if "mask_rcnn" not in value or not value.lower().endswith(".yaml"):
+            error(field, "choose a Mask R-CNN config-file (.yaml) in the folder './configs'")
+
+    def check_pretrained_weights(field, value, error):
+        if not value.lower().endswith((".yaml", ".pth", ".pkl")):
+            error(field, "load either the pretrained weights from the config-file (.yaml) or custom pretrained weights (.pth or .pkl)")
 
     threshold_list = ['confidence_threshold', 'nms_threshold', 'dropout_probability', 'iou_thres']
     for key, value in config.items():
@@ -96,6 +97,8 @@ def check_config_file(config, config_filename, input_yaml):
             if key == key1:
                 if key == "network_config":
                     schema[key] = {'type': value1, 'check_with': check_network_config}
+                elif key == "pretrained_weights":
+                    schema[key] = {'type': value1, 'check_with': check_pretrained_weights}
                 elif key == "repeat_factor_smallest_class":
                     schema[key] = {'type': value1, "min": 1}
                 elif key == "learning_policy":
@@ -391,11 +394,16 @@ def Train_MaskRCNN(config, weightsfolder, gpu_num, iter, val_value, dropout_prob
 
     ## add dropout layers to the architecture of Mask R-CNN
     cfg = get_cfg()
-    cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml"))
+    cfg.merge_from_file(model_zoo.get_config_file(config['network_config']))
     cfg.MODEL.ROI_BOX_HEAD.DROPOUT_PROBABILITY = dropout_probability
     cfg.MODEL.ROI_MASK_HEAD.DROPOUT_PROBABILITY = dropout_probability
-    cfg.MODEL.ROI_BOX_HEAD.NAME = 'FastRCNNConvFCHeadDropout'
-    cfg.MODEL.ROI_HEADS.NAME = 'StandardROIHeadsDropout'
+
+    if any(x in config['network_config'] for x in ["FPN", "DC5"]):
+        cfg.MODEL.ROI_BOX_HEAD.NAME = 'FastRCNNConvFCHeadDropout'
+        cfg.MODEL.ROI_HEADS.NAME = 'StandardROIHeadsDropout'
+    elif any(x in config['network_config'] for x in ["C4"]):
+        cfg.MODEL.ROI_HEADS.NAME = 'Res5ROIHeadsDropout'
+        
     cfg.MODEL.ROI_MASK_HEAD.NAME = 'MaskRCNNConvUpsampleHeadDropout'
     cfg.MODEL.ROI_HEADS.SOFTMAXES = False
     cfg.OUTPUT_DIR = weightsfolder
@@ -406,9 +414,15 @@ def Train_MaskRCNN(config, weightsfolder, gpu_num, iter, val_value, dropout_prob
         if os.path.isfile(os.path.join(cfg.OUTPUT_DIR, "best_model_{:s}.pth".format(str(iter-1).zfill(3)))):
             cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "best_model_{:s}.pth".format(str(iter-1).zfill(3)))
         else:
-            cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml")
+            if config['pretrained_weights'].lower().endswith(".yaml"):
+                cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(config['pretrained_weights'])
+            elif config['pretrained_weights'].lower().endswith((".pth", ".pkl")):
+                cfg.MODEL.WEIGHTS = config['pretrained_weights']
     else:
-        cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml")
+        if config['pretrained_weights'].lower().endswith(".yaml"):
+            cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(config['pretrained_weights'])
+        elif config['pretrained_weights'].lower().endswith((".pth", ".pkl")):
+            cfg.MODEL.WEIGHTS = config['pretrained_weights']
 
 
     ## initialize the train-sampler
