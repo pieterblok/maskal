@@ -12,6 +12,10 @@ traindir: "./datasets/train"
 valdir: "./datasets/val"
 testdir: "./datasets/test"
 
+# network parameters
+network_config: COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml
+pretrained_weights: COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml
+
 # training-parameters
 cuda_visible_devices: '0'
 classes: ['healthy', 'damaged', 'matured', 'cateye', 'headrot']

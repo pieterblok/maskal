@@ -1,4 +1,4 @@
-# Types to run maskAL
+# Types to run maskAL.yaml file
 
 # folders
 weightsroot: 'string'
@@ -23,11 +23,11 @@ warmup_iterations: 'integer'
 train_iterations_base: 'integer'
 train_iterations_step_size: 'integer'
 step_image_number: 'integer'
-step_ratios: ['float', 'list']
 eval_period: 'integer'
 checkpoint_period: 'integer'
 weight_decay: 'float'
 learning_policy: 'string'
+step_ratios: ['float', 'list']
 gamma: 'float'
 train_batch_size: 'integer'
 num_workers: 'integer'
@@ -51,8 +51,6 @@ equal_pool_size: 'boolean'
 loops: 'integer'
 dropout_probability: 'float'
 mcd_iterations: 'integer'
-dropout_method: 'string'
-al_batch_size: 'integer'
 iou_thres: 'float'
 auto_annotate: 'boolean'
 export_format: 'string'
