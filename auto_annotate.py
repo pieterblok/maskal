@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-10-26 17:58:38
+# @Last Modified time: 2021-11-11 21:24:06
 
 ## Use a trained model to auto-annotate unlabelled images
 
@@ -22,75 +22,11 @@ from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
 from detectron2.modeling import build_model
 from detectron2.checkpoint import DetectionCheckpointer
+from detectron2.utils.visualizer import Visualizer
+from detectron2.data import MetadataCatalog
 
 ## libraries for preparing the datasets
-from active_learning.sampling import list_files, write_cvat_annotations, write_labelme_annotations, write_supervisely_annotations
-
-
-## function to visualize the output of Mask R-CNN
-def visualize(img_np, classes, scores, masks, boxes, class_names):
-    masks = masks.astype(dtype=np.uint8)
-    font_scale = 0.6
-    font_thickness = 1
-    text_color = [0, 0, 0]
-
-    if masks.any():
-        maskstransposed = masks.transpose(1,2,0) # transform the mask in the same format as the input image array (h,w,num_dets)
-        red_mask = np.zeros((maskstransposed.shape[0],maskstransposed.shape[1]),dtype=np.uint8)
-        blue_mask = np.zeros((maskstransposed.shape[0],maskstransposed.shape[1]),dtype=np.uint8)
-        green_mask = np.zeros((maskstransposed.shape[0],maskstransposed.shape[1]),dtype=np.uint8)
-        all_masks = np.zeros((maskstransposed.shape[0],maskstransposed.shape[1],3),dtype=np.uint8) # BGR
-
-        colors = [(0, 255, 0), (255, 0, 0), (255, 0, 255), (0, 0, 255), (0, 255, 255), (255, 255, 255)]
-        color_list = np.remainder(np.arange(len(class_names)), len(colors))
-        imgcopy = img_np.copy()
-
-        for i in range (maskstransposed.shape[-1]):
-            x1, y1, x2, y2 = boxes[i, :]
-            cv2.rectangle(imgcopy, (int(x1), int(y1)), (int(x2), int(y2)), colors[classes[i]], 1)
-
-            _class = class_names[classes[i]]
-            color = colors[color_list[classes[i]]]
-            text_str = '%s: %.2f' % (_class, scores[i])
-
-            font_face = cv2.FONT_HERSHEY_DUPLEX
-
-            text_w, text_h = cv2.getTextSize(text_str, font_face, font_scale, font_thickness)[0]
-            text_pt = (int(x1), int(y1) - 3)
-
-            cv2.rectangle(imgcopy, (int(x1), int(y1)), (int(x1) + text_w, int(y1) - text_h - 4), colors[classes[i]], -1)
-            cv2.putText(imgcopy, text_str, text_pt, font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
-
-            mask = maskstransposed[:,:,i]
-
-            if colors.index(color) == 0: # green
-                green_mask = cv2.add(green_mask,mask)
-            elif colors.index(color) == 1: # blue
-                blue_mask = cv2.add(blue_mask,mask)
-            elif colors.index(color) == 2: # magenta
-                blue_mask = cv2.add(blue_mask,mask)
-                red_mask = cv2.add(red_mask,mask)
-            elif colors.index(color) == 3: # red
-                red_mask = cv2.add(red_mask,mask)
-            elif colors.index(color) == 4: # yellow
-                green_mask = cv2.add(green_mask,mask)
-                red_mask = cv2.add(red_mask,mask)
-            else: #white
-                blue_mask = cv2.add(blue_mask,mask)
-                green_mask = cv2.add(green_mask,mask)
-                red_mask = cv2.add(red_mask,mask)
-
-        all_masks[:,:,0] = blue_mask
-        all_masks[:,:,1] = green_mask
-        all_masks[:,:,2] = red_mask
-        all_masks = np.multiply(all_masks,255).astype(np.uint8)
-
-        img_mask = cv2.addWeighted(imgcopy,1,all_masks,0.5,0)
-    else:
-        img_mask = img_np
-
-    return img_mask
-
+from active_learning.sampling import list_files, visualize_mrcnn, write_cvat_annotations, write_labelme_annotations, write_supervisely_annotations
 
 
 if __name__ == "__main__":
@@ -110,13 +46,20 @@ if __name__ == "__main__":
     print(opt)
     print()
 
+    use_coco = False
     images, annotations = list_files(opt.img_dir)
 
     cfg = get_cfg()
     cfg.merge_from_file(model_zoo.get_config_file(opt.network_config))
     cfg.NUM_GPUS = 1
-    cfg.MODEL.ROI_HEADS.NUM_CLASSES = len(opt.classes)
-    cfg.MODEL.WEIGHTS = opt.weights_file
+
+    if opt.weights_file.lower().endswith(".yaml"):
+        cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(opt.weights_file)
+        use_coco = True
+    elif opt.weights_file.lower().endswith((".pth", ".pkl")):
+        cfg.MODEL.ROI_HEADS.NUM_CLASSES = len(opt.classes)
+        cfg.MODEL.WEIGHTS = opt.weights_file
+
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = opt.conf_thres
     cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = opt.nms_thres
     cfg.DATALOADER.NUM_WORKERS = 0
@@ -142,13 +85,19 @@ if __name__ == "__main__":
         boxes = instances.pred_boxes.tensor.numpy()
         masks = instances.pred_masks.numpy()
 
+        if use_coco:
+            v = Visualizer(img[:, :, ::-1], MetadataCatalog.get(cfg.DATASETS.TRAIN[0]), scale=1.2)
+            class_labels = v.metadata.get("thing_classes", None)
+        else:
+            class_labels = opt.classes
+
         class_names = []
         for h in range(len(classes)):
             class_id = classes[h]
-            class_name = opt.classes[class_id]
+            class_name = class_labels[class_id]
             class_names.append(class_name)
 
-        img_vis = visualize(img, classes, scores, masks, boxes, opt.classes)
+        img_vis = visualize_mrcnn(img, classes, scores, masks, boxes, class_labels)
 
         if opt.export_format == "cvat":
             write_cvat_annotations(opt.img_dir, basename, class_names, masks, height, width)
