@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-11-08 22:12:27
+# @Last Modified time: 2021-11-11 18:54:32
 
 ## Active learning with Mask R-CNN
 
@@ -414,10 +414,13 @@ def Train_MaskRCNN(config, weightsfolder, gpu_num, iter, val_value, dropout_prob
         if os.path.isfile(os.path.join(cfg.OUTPUT_DIR, "best_model_{:s}.pth".format(str(iter-1).zfill(3)))):
             cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "best_model_{:s}.pth".format(str(iter-1).zfill(3)))
         else:
-            if config['pretrained_weights'].lower().endswith(".yaml"):
-                cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(config['pretrained_weights'])
-            elif config['pretrained_weights'].lower().endswith((".pth", ".pkl")):
-                cfg.MODEL.WEIGHTS = config['pretrained_weights']
+            if os.path.isfile(os.path.join(cfg.OUTPUT_DIR, "model_final.pth")):
+                cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")
+            else:
+                if config['pretrained_weights'].lower().endswith(".yaml"):
+                    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(config['pretrained_weights'])
+                elif config['pretrained_weights'].lower().endswith((".pth", ".pkl")):
+                    cfg.MODEL.WEIGHTS = config['pretrained_weights']
     else:
         if config['pretrained_weights'].lower().endswith(".yaml"):
             cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(config['pretrained_weights'])
@@ -627,11 +630,10 @@ if __name__ == "__main__":
     max_entropy = calculate_max_entropy(config['classes'])
     if config['use_initial_train_dir']:
         move_initial_train_dir(config['initial_train_dir'], config['traindir'], "images")
-        prepare_initial_dataset(config['dataroot'], config['classes'], config['traindir'], config['initial_train_dir'], config['valdir'], config['testdir'])
+        prepare_initial_dataset(config)
         move_initial_train_dir(config['initial_train_dir'], config['traindir'], "annotations")
     else:
-        prepare_initial_dataset_randomly(config['dataroot'], config['classes'], config['traindir'], config['valdir'], config['testdir'], config['initial_datasize'])
-        
+        prepare_initial_dataset_randomly(config)
         
     ## active-learning
     for i, (strategy, equal_pool_size, pool_size, mcd_iterations, mode, dropout_probability, loops, weightsfolder, resultsfolder, csv_name) in enumerate(zip(config['strategies'], config['equal_pool_size'], config['pool_size'], config['mcd_iterations'], config['mode'], config['dropout_probability'], config['loops'], weightsfolders, resultsfolders, csv_names)):
@@ -641,7 +643,7 @@ if __name__ == "__main__":
             cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder, csv_name, 0, init=True)
         else:
             initial_train_names = get_initial_train_names(config)
-            update_train_dataset(cfg, config['dataroot'], config['traindir'], config['classes'], initial_train_names, config['auto_annotate'], config['export_format'], config['supervisely_meta_json'])
+            update_train_dataset(config, cfg, initial_train_names)
             cfg, dataset_dicts_train, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, 0, 0, dropout_probability, init=False)
             cfg = Eval_MaskRCNN(cfg, config, dataset_dicts_train, weightsfolder, resultsfolder, csv_name, 0, init=False)
         train_names = get_train_names(dataset_dicts_train, config['traindir'])
@@ -665,7 +667,7 @@ if __name__ == "__main__":
 
                 ## update the training list and retrain the algorithm
                 train_list = train_names + list(pool.keys())
-                update_train_dataset(cfg, config['dataroot'], config['traindir'], config['classes'], train_list, config['auto_annotate'], config['export_format'], config['supervisely_meta_json'])
+                update_train_dataset(config, cfg, train_list)
                 cfg, dataset_dicts_train, val_value = Train_MaskRCNN(config, weightsfolder, gpu_num, l+1, val_value, dropout_probability, init=False)
 
                 ## evaluate and write the pooled image-names to a txt-file

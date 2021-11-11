@@ -1,12 +1,12 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-10-26 17:58:57
+# @Last Modified time: 2021-11-11 20:09:18
 
 import sys
 import io
 import random
-import os
+import os, traceback
 import numpy as np
 import shutil
 import cv2
@@ -22,7 +22,14 @@ import base64
 from tqdm import tqdm
 import xmltodict
 import logging
+
+from detectron2 import model_zoo
 from detectron2.engine import DefaultPredictor
+from detectron2.config import get_cfg
+from detectron2.modeling import build_model
+from detectron2.checkpoint import DetectionCheckpointer
+from detectron2.utils.visualizer import Visualizer
+from detectron2.data import MetadataCatalog
 
 
 ## initialize the logging
@@ -36,6 +43,13 @@ logger.addHandler(file_handler)
 
 
 supported_cv2_formats = (".bmp", ".dib", ".jpeg", ".jpg", ".jpe", ".jp2", ".png", ".pbm", ".pgm", ".ppm", ".sr", ".ras", ".tiff", ".tif")
+
+
+def print_exception(e):
+    tb = sys.exc_info()[-1]
+    stk = traceback.extract_tb(tb, 2)
+    fname = stk[-1][2]
+    logger.error(f'Error in function {fname}: '+ repr(e))
 
 
 def list_files(rootdir):
@@ -514,7 +528,7 @@ def bounding_box(masks):
     return areas, boxes
 
 
-def visualize(img, category_ids, masks, boxes, classes):
+def visualize_annotations(img, category_ids, masks, boxes, classes):
     colors = [(0, 255, 0), (255, 0, 0), (255, 0, 255), (0, 0, 255), (0, 255, 255), (255, 255, 255)]
     color_list = np.remainder(np.arange(len(classes)), len(colors))
     
@@ -554,6 +568,70 @@ def visualize(img, category_ids, masks, boxes, classes):
         img_vis = cv2.putText(img_vis, text_str, (text_pt[0], text_pt[1]), font_face, font_scale, text_color2, font_thickness, cv2.LINE_AA)
 
     return img_vis
+
+
+def visualize_mrcnn(img_np, classes, scores, masks, boxes, class_names):
+    masks = masks.astype(dtype=np.uint8)
+    font_scale = 0.6
+    font_thickness = 1
+    text_color = [0, 0, 0]
+
+    if masks.any():
+        maskstransposed = masks.transpose(1,2,0) # transform the mask in the same format as the input image array (h,w,num_dets)
+        red_mask = np.zeros((maskstransposed.shape[0],maskstransposed.shape[1]),dtype=np.uint8)
+        blue_mask = np.zeros((maskstransposed.shape[0],maskstransposed.shape[1]),dtype=np.uint8)
+        green_mask = np.zeros((maskstransposed.shape[0],maskstransposed.shape[1]),dtype=np.uint8)
+        all_masks = np.zeros((maskstransposed.shape[0],maskstransposed.shape[1],3),dtype=np.uint8) # BGR
+
+        colors = [(0, 255, 0), (255, 0, 0), (255, 0, 255), (0, 0, 255), (0, 255, 255), (255, 255, 255)]
+        color_list = np.remainder(np.arange(len(class_names)), len(colors))
+        imgcopy = img_np.copy()
+
+        for i in range (maskstransposed.shape[-1]):
+            color = colors[color_list[classes[i]]]
+            x1, y1, x2, y2 = boxes[i, :]
+            cv2.rectangle(imgcopy, (int(x1), int(y1)), (int(x2), int(y2)), color, 1)
+
+            _class = class_names[classes[i]]
+            text_str = '%s: %.2f' % (_class, scores[i])
+
+            font_face = cv2.FONT_HERSHEY_DUPLEX
+
+            text_w, text_h = cv2.getTextSize(text_str, font_face, font_scale, font_thickness)[0]
+            text_pt = (int(x1), int(y1) - 3)
+
+            cv2.rectangle(imgcopy, (int(x1), int(y1)), (int(x1) + text_w, int(y1) - text_h - 4), color, -1)
+            cv2.putText(imgcopy, text_str, text_pt, font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
+
+            mask = maskstransposed[:,:,i]
+
+            if colors.index(color) == 0: # green
+                green_mask = cv2.add(green_mask,mask)
+            elif colors.index(color) == 1: # blue
+                blue_mask = cv2.add(blue_mask,mask)
+            elif colors.index(color) == 2: # magenta
+                blue_mask = cv2.add(blue_mask,mask)
+                red_mask = cv2.add(red_mask,mask)
+            elif colors.index(color) == 3: # red
+                red_mask = cv2.add(red_mask,mask)
+            elif colors.index(color) == 4: # yellow
+                green_mask = cv2.add(green_mask,mask)
+                red_mask = cv2.add(red_mask,mask)
+            else: #white
+                blue_mask = cv2.add(blue_mask,mask)
+                green_mask = cv2.add(green_mask,mask)
+                red_mask = cv2.add(red_mask,mask)
+
+        all_masks[:,:,0] = blue_mask
+        all_masks[:,:,1] = green_mask
+        all_masks[:,:,2] = red_mask
+        all_masks = np.multiply(all_masks,255).astype(np.uint8)
+
+        img_mask = cv2.addWeighted(imgcopy,1,all_masks,0.5,0)
+    else:
+        img_mask = img_np
+
+    return img_mask
 
 
 def write_file(imgdir, images, name):
@@ -717,7 +795,7 @@ def create_json(rootdir, imgdir, images, classes, name):
                 category_ids, masks, crowd_ids, status = process_supervisely_json(annot_filename, classes)
 
             areas, boxes = bounding_box(masks)
-            img_vis = visualize(img, category_ids, masks, boxes, classes)
+            img_vis = visualize_annotations(img, category_ids, masks, boxes, classes)
 
             for q in range(len(category_ids)):
                 category_id = category_ids[q]
@@ -768,7 +846,7 @@ def highlight_missing_annotations(annot_folder, cur_annot_diff):
     return diff_img_annot, cur_annot_diff
     
 
-def check_json_presence(imgdir, dataset, name, cfg=[], all_classes=[], auto_annotate=False, export_format=[], meta_json=[]):
+def check_json_presence(config, imgdir, dataset, name, cfg=[]):
     print("")
     print("Checking {:s} annotations...".format(name))
     rename_xml_files(imgdir)
@@ -802,14 +880,10 @@ def check_json_presence(imgdir, dataset, name, cfg=[], all_classes=[], auto_anno
         for p in range(len(diff_img_annot)):
             search_idx = img_basenames.index(diff_img_annot[p])
             image_copy = dataset[search_idx]
-
-            if not os.path.isdir(os.path.dirname(os.path.join(annot_folder, image_copy))):
-                os.makedirs(os.path.dirname(os.path.join(annot_folder, image_copy)))
-
-            shutil.copyfile(os.path.join(imgdir, image_copy), os.path.join(annot_folder, image_copy))
+            shutil.copyfile(os.path.join(imgdir, image_copy), os.path.join(annot_folder, os.path.basename(image_copy)))
 
     ## check whether all images have been annotated in the "annotate" subdirectory
-    if not auto_annotate:
+    if not config['auto_annotate']:
         while len(diff_img_annot) > 0:
             diff_img_annot, cur_annot_diff = highlight_missing_annotations(annot_folder, cur_annot_diff)
 
@@ -817,6 +891,29 @@ def check_json_presence(imgdir, dataset, name, cfg=[], all_classes=[], auto_anno
         if len(diff_img_annot) > 0:
             rename_xml_files(annot_folder)
             images, annotations = list_files(annot_folder)
+            use_coco = False
+
+            if not cfg:
+                cfg = get_cfg()
+                cfg.merge_from_file(model_zoo.get_config_file(config['network_config']))
+                cfg.NUM_GPUS = 1
+
+                if config['pretrained_weights'].lower().endswith(".yaml"):
+                    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(config['pretrained_weights'])
+                    use_coco = True
+                elif config['pretrained_weights'].lower().endswith((".pth", ".pkl")):
+                    cfg.MODEL.ROI_HEADS.NUM_CLASSES = len(config['classes'])
+                    cfg.MODEL.WEIGHTS = config['pretrained_weights']
+
+                cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = config['confidence_threshold']
+                cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = config['nms_threshold']
+                cfg.DATALOADER.NUM_WORKERS = 0
+                cfg.MODEL.ROI_HEADS.SOFTMAXES = False
+                
+                model = build_model(cfg)
+                checkpointer = DetectionCheckpointer(model)
+                checkpointer.load(cfg.MODEL.WEIGHTS)
+
             predictor = DefaultPredictor(cfg)
 
             for i in tqdm(range(len(images))):
@@ -830,20 +927,30 @@ def check_json_presence(imgdir, dataset, name, cfg=[], all_classes=[], auto_anno
                 outputs = predictor(img)
                 instances = outputs["instances"].to("cpu")
                 classes = instances.pred_classes.numpy()
+                scores = instances.scores.numpy()
+                boxes = instances.pred_boxes.tensor.numpy()
                 masks = instances.pred_masks.numpy()
+
+                if use_coco:
+                    v = Visualizer(img[:, :, ::-1], MetadataCatalog.get(cfg.DATASETS.TRAIN[0]), scale=1.2)
+                    class_labels = v.metadata.get("thing_classes", None)
+                else:
+                    class_labels = config['classes']
 
                 class_names = []
                 for h in range(len(classes)):
                     class_id = classes[h]
-                    class_name = all_classes[class_id]
+                    class_name = class_labels[class_id]
                     class_names.append(class_name)
+                    
+                img_vis = visualize_mrcnn(img, classes, scores, masks, boxes, class_labels)
 
-                if export_format == 'labelme':
+                if config['export_format'] == 'labelme':
                     write_labelme_annotations(annot_folder, basename, class_names, masks, height, width)
-                elif export_format == 'cvat':
+                elif config['export_format'] == 'cvat':
                     write_cvat_annotations(annot_folder, basename, class_names, masks, height, width)
-                elif export_format == 'supervisely':
-                    write_supervisely_annotations(annot_folder, basename, class_names, masks, height, width, meta_json)
+                elif config['export_format'] == 'supervisely':
+                    write_supervisely_annotations(annot_folder, basename, class_names, masks, height, width, config['supervisely_meta_json'])
                 else:
                     logger.error("unsupported export_format in the maskAL.yaml file")
                     sys.exit("Closing application")
@@ -860,7 +967,11 @@ def check_json_presence(imgdir, dataset, name, cfg=[], all_classes=[], auto_anno
         images, annotations = list_files(annot_folder)
         for a in range(len(annotations)):
             annotation = annotations[a]
-            shutil.copyfile(os.path.join(annot_folder, annotation), os.path.join(imgdir, annotation))
+            subdirname = [os.path.dirname(imgb) for imgb in img_basenames if os.path.splitext(annotation)[0] in imgb]
+            if subdirname == ['']:
+                shutil.copyfile(os.path.join(annot_folder, annotation), os.path.join(imgdir, annotation))
+            else:
+                shutil.copyfile(os.path.join(annot_folder, annotation), os.path.join(imgdir, subdirname[0], annotation))  
 
         ## remove the annotation-folder again
         annot_folder_present = os.path.isdir(annot_folder)
@@ -1160,53 +1271,6 @@ def prepare_all_dataset_randomly(rootdir, imgdir, classes, train_val_test_split,
         create_json(rootdir, imgdir, dataset, classes, name)   
 
 
-def prepare_initial_dataset_randomly(rootdir, classes, traindir, valdir, testdir, initial_datasize):
-    try:
-        for imgdir, name, init_ds in zip([traindir, valdir, testdir], ['train', 'val', 'test'], [initial_datasize, 0, 0]):
-            print("")
-            print("Processing {:s}-dataset: {:s}".format(name, imgdir))
-            rename_xml_files(imgdir)
-            images, annotations = list_files(imgdir)
-            print("{:d} images found!".format(len(images)))
-            print("{:d} annotations found!".format(len(annotations)))
-
-            if init_ds > 0:
-                initial_train_images = random.sample(images, initial_datasize)
-                write_file(rootdir, images, "train")
-                write_file(rootdir, initial_train_images, "initial_train")
-                check_json_presence(imgdir, initial_train_images, "train")
-                create_json(rootdir, imgdir, initial_train_images, classes, "train")
-            else:
-                write_file(rootdir, images, name)
-                check_json_presence(imgdir, images, name)
-                create_json(rootdir, imgdir, images, classes, name)
-    except:
-        logger.error("Cannot create initial-datasets")
-        sys.exit("Closing application")
-
-
-def prepare_initial_dataset(rootdir, classes, traindir, initial_train_dir, valdir, testdir):
-    try:
-        for i, (imgdir, name) in enumerate(zip([traindir, initial_train_dir, valdir, testdir], ['train', 'initial_train', 'val', 'test'])):
-            print("")
-            print("Processing {:s}-dataset: {:s}".format(name, imgdir))
-            rename_xml_files(imgdir)
-            images, annotations = list_files(imgdir)
-            print("{:d} images found!".format(len(images)))
-            print("{:d} annotations found!".format(len(annotations)))
-            write_file(rootdir, images, name)
-
-            if i != 0:
-                if "train" in name:
-                    name = "train"
-                check_json_presence(imgdir, images, name)
-                create_json(rootdir, imgdir, images, classes, name)
-
-    except:
-        logger.error("Cannot create initial-datasets")
-        sys.exit("Closing application")
-
-
 def prepare_complete_dataset(rootdir, classes, traindir, valdir, testdir):
     try:
         for imgdir, name in zip([traindir, valdir, testdir], ['train', 'val', 'test']):
@@ -1222,19 +1286,72 @@ def prepare_complete_dataset(rootdir, classes, traindir, valdir, testdir):
             create_json(rootdir, imgdir, images, classes, name)
     except:
         logger.error("Cannot create complete-dataset")
-        sys.exit("Closing application")            
+        sys.exit("Closing application")   
 
 
-def update_train_dataset(cfg, rootdir, imgdir, classes, train_list, auto_annotate, export_format, meta_json):
+def prepare_initial_dataset_randomly(config):
     try:
-        rename_xml_files(imgdir)
-        images, annotations = list_files(imgdir)
+        for imgdir, name, init_ds in zip([config['traindir'], config['valdir'], config['testdir']], ['train', 'val', 'test'], [config['initial_datasize'], 0, 0]):
+            print("")
+            print("Processing {:s}-dataset: {:s}".format(name, imgdir))
+            rename_xml_files(imgdir)
+            images, annotations = list_files(imgdir)
+            print("{:d} images found!".format(len(images)))
+            print("{:d} annotations found!".format(len(annotations)))
+
+            if init_ds > 0:
+                initial_train_images = random.sample(images, config['initial_datasize'])
+                write_file(config['dataroot'], images, "train")
+                write_file(config['dataroot'], initial_train_images, "initial_train")
+                check_json_presence(config, imgdir, initial_train_images, "train")
+                create_json(config['dataroot'], imgdir, initial_train_images, config['classes'], "train")
+            else:
+                write_file(config['dataroot'], images, name)
+                check_json_presence(config, imgdir, images, name)
+                create_json(config['dataroot'], imgdir, images, config['classes'], name)
+                
+    except Exception as e:
+        print_exception(e)
+        logger.error("Cannot create initial-datasets")
+        sys.exit("Closing application")
+
+
+
+def prepare_initial_dataset(config):
+    try:
+        for i, (imgdir, name) in enumerate(zip([config['traindir'], config['initial_train_dir'], config['valdir'], config['testdir']], ['train', 'initial_train', 'val', 'test'])):
+            print("")
+            print("Processing {:s}-dataset: {:s}".format(name, imgdir))
+            rename_xml_files(imgdir)
+            images, annotations = list_files(imgdir)
+            print("{:d} images found!".format(len(images)))
+            print("{:d} annotations found!".format(len(annotations)))
+            write_file(config['dataroot'], images, name)
+
+            if i != 0:
+                if "train" in name:
+                    name = "train"
+                check_json_presence(config, imgdir, images, name)
+                create_json(config['dataroot'], imgdir, images, config['classes'], name)
+
+    except Exception as e:
+        print_exception(e)
+        logger.error("Cannot create initial-datasets")
+        sys.exit("Closing application")     
+
+
+def update_train_dataset(config, cfg, train_list):
+    try:
+        rename_xml_files(config['traindir'])
+        images, annotations = list_files(config['traindir'])
         print("{:d} images found!".format(len(images)))
         print("{:d} annotations found!".format(len(annotations)))
 
-        check_json_presence(imgdir, train_list, "train", cfg, classes, auto_annotate, export_format, meta_json)
+        check_json_presence(config, config['traindir'], train_list, "train", cfg)
         print("Converting annotations...")
-        create_json(rootdir, imgdir, train_list, classes, "train")
-    except:
+        create_json(config['dataroot'], config['traindir'], train_list, config['classes'], "train")
+        
+    except Exception as e:
+        print_exception(e)
         logger.error("Cannot update train-dataset")
         sys.exit("Closing application")
