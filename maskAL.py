@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-11-11 18:54:32
+# @Last Modified time: 2021-11-12 12:50:38
 
 ## Active learning with Mask R-CNN
 
@@ -110,7 +110,7 @@ def check_config_file(config, config_filename, input_yaml):
                 elif key == "mode":
                     schema[key] = {'type': value1, 'allowed': ['mean', 'min']}
                 elif key == "export_format":
-                    schema[key] = {'type': value1, 'allowed': ['labelme', 'cvat', 'supervisely']}
+                    schema[key] = {'type': value1, 'allowed': ['labelme', 'cvat', 'supervisely', 'darwin']}
                 elif key in threshold_list:
                     schema[key] = {'type': value1, "min": 0, "max": 1}
                 else:

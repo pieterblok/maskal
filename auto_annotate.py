@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-11-11 21:24:06
+# @Last Modified time: 2021-11-12 20:32:30
 
 ## Use a trained model to auto-annotate unlabelled images
 
@@ -26,7 +26,7 @@ from detectron2.utils.visualizer import Visualizer
 from detectron2.data import MetadataCatalog
 
 ## libraries for preparing the datasets
-from active_learning.sampling import list_files, visualize_mrcnn, write_cvat_annotations, write_labelme_annotations, write_supervisely_annotations
+from active_learning.sampling import list_files, visualize_mrcnn, write_cvat_annotations, write_darwin_annotations, write_labelme_annotations, write_supervisely_annotations
 
 
 if __name__ == "__main__":
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     parser.add_argument('--conf_thres', type=float, default=0.5, help='confidence threshold for the Mask R-CNN inference')
     parser.add_argument('--nms_thres', type=float, default=0.2, help='non-maximum suppression threshold for the Mask R-CNN inference')
     parser.add_argument('--weights_file', type=str, default=[], help='weight-file (.pth)')
-    parser.add_argument('--export_format', type=str, default='cvat', help='Choose either "labelme", "cvat" or "supervisely"')
+    parser.add_argument('--export_format', type=str, default='labelme', help='Choose either "labelme", "cvat", "darwin", "supervisely"')
     parser.add_argument('--supervisely_meta_json', type=str, default="", help='the file location of the meta.json for supervisely export')
 
     ## Load the args_parser and initialize some variables
@@ -101,6 +101,9 @@ if __name__ == "__main__":
 
         if opt.export_format == "cvat":
             write_cvat_annotations(opt.img_dir, basename, class_names, masks, height, width)
+
+        if opt.export_format == "darwin":
+            write_darwin_annotations(opt.img_dir, basename, class_names, masks, height, width)
         
         if opt.export_format == "labelme":
             write_labelme_annotations(opt.img_dir, basename, class_names, masks, height, width)

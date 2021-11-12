@@ -23,6 +23,6 @@ The following settings can probably stay unchanged: <br/> <br/>
 | mode					| Uncertainty sampling method. Use **'mean'** when you want to sample the most uncertain images, use **'min'** when you want to sample the most uncertain instances																	|
 | equal_pool_size			| When **True** this will sample the same **pool_size** for every sampling iteration. When **False**, an unequal **pool_size** will be sampled for the specified number of loops															|
 | dropout_probability			| Specify the dropout probability between 0.1 and 0.9. Our experiments indicated that **0.25** is a good value		|
-| mcd_iterations			| The number of Monte-Carlo iterations to calculate the uncertainty of the image. When this number is increased, the uncertainty metric will be more consistent. When this number is decreased, the sampling will be faster. The value **20** is a good compromise between consistency and speed	|
+| mcd_iterations			| The number of Monte-Carlo iterations to calculate the uncertainty of the image. When this number is increased, the uncertainty metric will be more consistent. When this number is decreased, the sampling will be faster. The value **10** is a good compromise between consistency and speed	|
 | iou_thres				| Intersection of Union threshold to cluster the different instance segmentations into observations for the uncertainty calculation																			|
 <br/>

@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-11-11 20:09:18
+# @Last Modified time: 2021-11-12 14:03:46
 
 import sys
 import io
@@ -951,6 +951,8 @@ def check_json_presence(config, imgdir, dataset, name, cfg=[]):
                     write_cvat_annotations(annot_folder, basename, class_names, masks, height, width)
                 elif config['export_format'] == 'supervisely':
                     write_supervisely_annotations(annot_folder, basename, class_names, masks, height, width, config['supervisely_meta_json'])
+                elif config['export_format'] == "darwin":
+                    write_darwin_annotations(annot_folder, basename, class_names, masks, height, width)
                 else:
                     logger.error("unsupported export_format in the maskAL.yaml file")
                     sys.exit("Closing application")
@@ -1047,6 +1049,77 @@ def write_labelme_annotations(write_dir, basename, class_names, masks, height, w
         writedata['imageData'] = None
         writedata['imageHeight'] = height
         writedata['imageWidth'] = width
+
+        jn = os.path.splitext(basename)[0] +'.json'
+        if useful_masks:
+            with open(os.path.join(write_dir, jn), 'w') as outfile:
+                json.dump(writedata, outfile)
+
+
+def write_darwin_annotations(write_dir, basename, class_names, masks, height, width):
+    masks = masks.astype(np.uint8)
+
+    if masks.any():
+        writedata = {}
+        writedata['dataset'] = "maskAL_export"
+        writedata['image'] = {
+            "width": width,
+            "height": height,
+            "original_filename": basename,
+            "filename": basename,
+            "url": "https://darwin.v7labs.com/",
+            "thumbnail_url": "https://darwin.v7labs.com/",
+            "path": "/",
+            "workview_url": "https://darwin.v7labs.com/"
+        }
+        writedata['annotations'] = []
+        writename = basename
+
+        md, mh, mw = masks.shape
+        maskstransposed = masks.transpose(1,2,0) # transform the mask in the same format as the input image array (h,w,num_dets)
+        useful_masks = False
+
+        for i in range (maskstransposed.shape[-1]):
+            masksel = maskstransposed[:,:,i] # select the individual masks
+            class_name = class_names[i]
+            contours, hierarchy = cv2.findContours((masksel*255).astype(np.uint8),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+            cnt = np.concatenate(contours)
+               
+            if cv2.contourArea(cnt) > 50:
+                useful_masks = True
+                if len(contours) == 1:
+                    segm = np.vstack(contours).squeeze()
+                    if segm.ndim > 1:
+                        x = [float(segm[idx][0]) for idx in range(len(segm))]
+                        y = [float(segm[idx][1]) for idx in range(len(segm))]
+                        xy = list(zip(x, y))
+
+                        writedata['annotations'].append({
+                            'instance_id': {"value": i+1},
+                            'name': class_name,
+                            'polygon': {"path": []},
+                        })
+
+                        for r in range(len(xy)):
+                            writedata['annotations'][i]['polygon']["path"].append({"x": xy[r][0], "y": xy[r][1]})
+
+                elif len(contours) > 1:
+                    writedata['annotations'].append({
+                            'instance_id': {"value": i+1},
+                            'name': class_name,
+                            'complex_polygon': {"path": []},
+                        })
+                    for s in range(len(contours)):
+                        cnt = contours[s]
+                        segm = np.vstack(cnt).squeeze()
+                        if segm.ndim > 1:
+                            writedata['annotations'][i]['complex_polygon']["path"].append([])
+                            x = [float(segm[idx][0]) for idx in range(len(segm))]
+                            y = [float(segm[idx][1]) for idx in range(len(segm))]
+                            xy = list(zip(x, y))
+
+                            for r in range(len(xy)):
+                                writedata['annotations'][i]['complex_polygon']["path"][s].append({"x": xy[r][0], "y": xy[r][1]})
 
         jn = os.path.splitext(basename)[0] +'.json'
         if useful_masks:
