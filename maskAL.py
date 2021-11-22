@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-11-12 12:50:38
+# @Last Modified time: 2021-11-22 16:11:35
 
 ## Active learning with Mask R-CNN
 
@@ -129,14 +129,15 @@ def check_config_file(config, config_filename, input_yaml):
         if isinstance(value, list):
             for key1, value1 in desired_inputs.items():
                 if key == key1:
-                    if not all(isinstance(v, known_types[value1[0]]) for v in value):
-                        error_list.update({key: ["not all items are of type: " + str(value1[0])]})
-                    if key == "strategies":
-                        if not all(v in ['uncertainty', 'certainty', 'random'] for v in value):
-                            error_list.update({key: ["choose 1 of these 3 options: 'uncertainty', 'certainty', 'random'"]})
-                    if key == "mode":
-                        if not all(v in ['mean', 'min'] for v in value):
-                            error_list.update({key: ["choose 1 of these 2 options: 'mean', 'min'"]})
+                    if isinstance(value1, list):
+                        if not all(isinstance(v, known_types[value1[0]]) for v in value):
+                            error_list.update({key: ["not all items are of type: " + str(value1[0])]})
+                        if key == "strategies":
+                            if not all(v in ['uncertainty', 'certainty', 'random'] for v in value):
+                                error_list.update({key: ["choose 1 of these 3 options: 'uncertainty', 'certainty', 'random'"]})
+                        if key == "mode":
+                            if not all(v in ['mean', 'min'] for v in value):
+                                error_list.update({key: ["choose 1 of these 2 options: 'mean', 'min'"]})
         else:
             check[key] = value
             if not v.validate(check):

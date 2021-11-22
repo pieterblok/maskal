@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-11-12 14:03:46
+# @Last Modified time: 2021-11-22 18:39:36
 
 import sys
 import io
@@ -1109,6 +1109,7 @@ def write_darwin_annotations(write_dir, basename, class_names, masks, height, wi
                             'name': class_name,
                             'complex_polygon': {"path": []},
                         })
+                    vc = 0
                     for s in range(len(contours)):
                         cnt = contours[s]
                         segm = np.vstack(cnt).squeeze()
@@ -1119,7 +1120,8 @@ def write_darwin_annotations(write_dir, basename, class_names, masks, height, wi
                             xy = list(zip(x, y))
 
                             for r in range(len(xy)):
-                                writedata['annotations'][i]['complex_polygon']["path"][s].append({"x": xy[r][0], "y": xy[r][1]})
+                                writedata['annotations'][i]['complex_polygon']["path"][vc].append({"x": xy[r][0], "y": xy[r][1]})
+                            vc += 1
 
         jn = os.path.splitext(basename)[0] +'.json'
         if useful_masks:

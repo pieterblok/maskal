@@ -16,7 +16,7 @@ pretrained_weights: 'string'
 
 # training-parameters
 cuda_visible_devices: 'string'
-classes: ['string', 'list']
+classes: 'list'
 transfer_learning_on_previous_models: 'boolean'
 learning_rate: 'float'
 warmup_iterations: 'integer'
