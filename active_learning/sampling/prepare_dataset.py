@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-11-22 18:39:36
+# @Last Modified time: 2021-11-29 10:55:29
 
 import sys
 import io
@@ -430,6 +430,35 @@ def process_cvat_xml(xmlfile, classnames):
             status = "unsuccessful"
 
     return category_ids, masks, crowd_ids, status
+
+
+def mkdir_supervisely(img_dir, write_dir, supervisely_meta_json):
+    out_dir =  os.path.join(write_dir, "out_supervisely")
+    if os.path.exists(out_dir):
+        shutil.rmtree(out_dir)
+        
+    ds_dir = os.path.join(out_dir, "ds0")
+    out_img_dir =  os.path.join(ds_dir, "img")
+    out_ann_dir =  os.path.join(ds_dir, "ann")
+
+    dirs = [out_dir, ds_dir, out_img_dir, out_ann_dir]
+    for d in range(len(dirs)):
+        if not os.path.exists(dirs[d]):
+            os.mkdir(dirs[d])
+
+    out_meta_path = os.path.join(out_dir, "meta.json")
+    shutil.copy(supervisely_meta_json, out_meta_path)
+    files = os.listdir(img_dir)
+
+    for cur_file in files:
+        if cur_file.lower().endswith(supported_cv2_formats):
+            img_path = os.path.join(img_dir, cur_file)
+            out_img_path = os.path.join(out_img_dir, cur_file)
+            if not os.path.exists(out_img_path):
+                shutil.copy(img_path, out_img_path)
+
+    print("Output folder:", out_dir)
+    return out_ann_dir  
 
 
 def process_supervisely_json(jsonfile, classnames):
@@ -889,6 +918,9 @@ def check_json_presence(config, imgdir, dataset, name, cfg=[]):
 
     else:
         if len(diff_img_annot) > 0:
+            if config['export_format'] == 'supervisely':
+                out_ann_dir = mkdir_supervisely(annot_folder, config['dataroot'], config['supervisely_meta_json'])
+
             rename_xml_files(annot_folder)
             images, annotations = list_files(annot_folder)
             use_coco = False
@@ -950,6 +982,7 @@ def check_json_presence(config, imgdir, dataset, name, cfg=[]):
                 elif config['export_format'] == 'cvat':
                     write_cvat_annotations(annot_folder, basename, class_names, masks, height, width)
                 elif config['export_format'] == 'supervisely':
+                    write_supervisely_annotations(out_ann_dir, basename, class_names, masks, height, width, config['supervisely_meta_json'])
                     write_supervisely_annotations(annot_folder, basename, class_names, masks, height, width, config['supervisely_meta_json'])
                 elif config['export_format'] == "darwin":
                     write_darwin_annotations(annot_folder, basename, class_names, masks, height, width)
@@ -961,7 +994,11 @@ def check_json_presence(config, imgdir, dataset, name, cfg=[]):
             while len(diff_img_annot) > 0:
                 diff_img_annot, cur_annot_diff = highlight_missing_annotations(annot_folder, cur_annot_diff)
             
-            input("Press Enter when all annotations have been checked in folder: {:s}".format(annot_folder))
+            if config['export_format'] == 'supervisely':
+                print("Load the preprocessed folder '{:s}' into Supervisely \n\nAfter checking, copy-paste the updated json-annotations to folder '{:s}'\n".format(os.path.join(config['dataroot'], "out_supervisely"), annot_folder))
+                input("Press Enter to continue")
+            else:
+                input("Press Enter when all annotations have been checked in folder: {:s}".format(annot_folder))
 
     if os.path.isdir(annot_folder):
         ## copy the annotations back to the imgdir
@@ -970,7 +1007,7 @@ def check_json_presence(config, imgdir, dataset, name, cfg=[]):
         for a in range(len(annotations)):
             annotation = annotations[a]
             subdirname = [os.path.dirname(imgb) for imgb in img_basenames if os.path.splitext(annotation)[0] in imgb]
-            if subdirname == ['']:
+            if subdirname == [''] or subdirname == []:
                 shutil.copyfile(os.path.join(annot_folder, annotation), os.path.join(imgdir, annotation))
             else:
                 shutil.copyfile(os.path.join(annot_folder, annotation), os.path.join(imgdir, subdirname[0], annotation))  
