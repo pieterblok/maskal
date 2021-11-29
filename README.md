@@ -20,7 +20,7 @@ The figure below shows the performance improvement of maskAL on our dataset. By 
 See [INSTALL.md](INSTALL.md)
 <br/> <br/>
 
-## Data preparation
+## Data preparation and training
 Split the dataset in a training set, validation set and a test set. It is not required to annotate every image in the training set, because maskAL will select the most-informative images automatically. <br/> 
 
 1. From the training set, a smaller initial dataset is randomly sampled (the dataset size can be specified in the **maskAL.yaml** file). The images that do not have an annotation are placed in the **annotate** subfolder inside the image folder. You first need to annotate these images with LabelMe (json), V7-Darwin (json), Supervisely (json) or CVAT (xml) (when using CVAT, export the annotations to **LabelMe 3.0** format). Refer to our annotation procedure: [ANNOTATION.md](ANNOTATION.md) 
@@ -34,11 +34,13 @@ Please note that maskAL does not work with the default COCO json-files of detect
 <br/><br/>
 
 ## How to use maskAL
-1. open a terminal
-2. cd maskAL
-3. activate the maskAL virtual environment (conda activate maskAL)
-4. python maskAL.py --config maskAL.yaml <br/> <br/>
-
+Open a terminal (Ctrl+Alt+T):
+```console
+(base) user@computer:~$ cd maskAL
+(base) user@computer:~/maskAL$ conda activate maskAL
+(maskAL) user@computer:~/maskAL$ python maskAL.py --config maskAL.yaml
+```
+<br/>
 Change the following settings in the maskAL.yaml file: <br/>
 
 | Setting        	| Description           														|
@@ -88,7 +90,10 @@ Use a trained Mask R-CNN algorithm to auto-annotate unlabelled images: **auto_an
 <br/>
 
 **Example syntax (auto_annotate.py):**
-<br/> python auto_annotate.py --img_dir datasets/train --network_config COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml --classes healthy damaged matured cateye headrot --conf_thres 0.5 --nms_thres 0.2 --weights_file weights/broccoli/model_final.pth --export_format supervisely --supervisely_meta_json datasets/meta.json <br/> <br/>
+```python
+python auto_annotate.py --img_dir datasets/train --network_config COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml --classes healthy damaged matured cateye headrot --conf_thres 0.5 --nms_thres 0.2 --weights_file weights/broccoli/model_final.pth --export_format supervisely --supervisely_meta_json datasets/meta.json
+```
+<br/>
 
 ## Troubleshooting
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
