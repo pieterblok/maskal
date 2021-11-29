@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 15:06:20
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-10-08 09:13:44
+# @Last Modified time: 2021-11-29 11:50:03
 
 # This function is inspired by the uncertainty_aware_dropout function:
 # https://github.com/RovelMan/active-learning-framework/blob/master/al_framework/strategies/dropout.py
@@ -17,13 +17,14 @@ def uncertainty(observations, iterations, max_entropy, width, height, device, mo
     
     for key, val in observations.items():
         softmaxes = [v['softmaxes'] for v in val]
-        entropies = torch.stack([torch.distributions.Categorical(softmax).entropy() for softmax in softmaxes])
         
-        ## first normalize the entropy-value with the maximum entropy (which is the least confident situation with equal softmaxes for all classes)
-        entropies_norm = torch.stack([torch.divide(entropy, max_entropy.to(device)) for entropy in entropies])
-
-        ## invert the normalized entropy-values so it can be properly used in the uncertainty calculation
-        inv_entropies_norm = torch.stack([torch.subtract(torch.ones(1).to(device), entropy_norm) for entropy_norm in entropies_norm])
+        ## check if there is only one class (then use the softmax-values), otherwise do the entropy calculation 
+        if len(softmaxes[0]) == 1:
+            inv_entropies_norm = torch.stack([softmax for softmax in softmaxes])
+        else:
+            entropies = torch.stack([torch.distributions.Categorical(softmax).entropy() for softmax in softmaxes])
+            entropies_norm = torch.stack([torch.divide(entropy, max_entropy.to(device)) for entropy in entropies]) ## first normalize the entropy-value with the maximum entropy (which is the least confident situation with equal softmaxes for all classes)
+            inv_entropies_norm = torch.stack([torch.subtract(torch.ones(1).to(device), entropy_norm) for entropy_norm in entropies_norm]) ## invert the normalized entropy-values so it can be properly used in the uncertainty calculation
 
         mean_bbox = torch.mean(torch.stack([v['pred_boxes'].tensor for v in val]), axis=0)
         mean_mask = torch.mean(torch.stack([v['pred_masks'].flatten().type(torch.cuda.FloatTensor) for v in val]), axis=0)
