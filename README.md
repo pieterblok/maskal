@@ -1,18 +1,18 @@
-# maskAL - Active learning for Mask R-CNN in Detectron2
+# MaskAL - Active learning for Mask R-CNN in Detectron2
 
 <p align="center">
   <img src="./demo/maskAL_framework.png?raw=true" alt="maskAL_framework"/>
 </p>
 
 ## Summary
-maskAL is an active learning framework that automatically selects the most-informative images for training Mask R-CNN. By using maskAL, it is possible to reduce the number of image annotations, without negatively affecting the performance of Mask R-CNN. Generally speaking, maskAL involves the following steps:
+MaskAL is an active learning framework that automatically selects the most-informative images for training Mask R-CNN. By using MaskAL, it is possible to reduce the number of image annotations, without negatively affecting the performance of Mask R-CNN. Generally speaking, MaskAL involves the following steps:
 1. Train Mask R-CNN on a small initial subset of a bigger dataset
 2. Use the trained Mask R-CNN algorithm to make predictions on the unlabelled images of the remaining dataset
 3. Select the most-informative images with a sampling algorithm
 4. Annotate the most-informative images, and then retrain Mask R-CNN on the most informative-images
 5. Repeat step 2-4 for a specified number of sampling iterations <br/><br/>
 
-The figure below shows the performance improvement of maskAL on our dataset. By using maskAL, the performance of Mask R-CNN improved more quickly and therefore 1400 annotations could be saved (see the black dashed line):
+The figure below shows the performance improvement of MaskAL on our dataset. By using MaskAL, the performance of Mask R-CNN improved more quickly and therefore 1400 annotations could be saved (see the black dashed line):
 
 ![maskAL_graph](./demo/maskAL_vs_random.png?raw=true)
 
@@ -21,7 +21,7 @@ See [INSTALL.md](INSTALL.md)
 <br/> <br/>
 
 ## Data preparation and training
-Split the dataset in a training set, validation set and a test set. It is not required to annotate every image in the training set, because maskAL will select the most-informative images automatically. <br/> 
+Split the dataset in a training set, validation set and a test set. It is not required to annotate every image in the training set, because MaskAL will select the most-informative images automatically. <br/> 
 
 1. From the training set, a smaller initial dataset is randomly sampled (the dataset size can be specified in the **maskAL.yaml** file). The images that do not have an annotation are placed in the **annotate** subfolder inside the image folder. You first need to annotate these images with LabelMe (json), V7-Darwin (json), Supervisely (json) or CVAT (xml) (when using CVAT, export the annotations to **LabelMe 3.0** format). Refer to our annotation procedure: [ANNOTATION.md](ANNOTATION.md) 
 2. Step 1 is repeated for the validation set and the test set (the file locations can be specified in the **maskAL.yaml** file). 
@@ -30,15 +30,15 @@ Split the dataset in a training set, validation set and a test set. It is not re
 5. OPTIONAL: it is possible to use the trained Mask R-CNN model to auto-annotate the unlabelled images to further reduce annotation time. Activate **auto_annotate** in the **maskAL.yaml** file, and specify the **export_format** (currently supported formats: **'labelme'**, **'cvat'**, **'darwin'**, **'supervisely'**). 
 6. Step 3-5 are repeated for several training iterations. The number of iterations (**loops**) can be specified in the **maskAL.yaml** file.
 
-Please note that maskAL does not work with the default COCO json-files of detectron2. These json-files contain all annotations that are completed before the training starts. Because maskAL involves an iterative train and annotation procedure, the default COCO json-files lack the desired format.
+Please note that MaskAL does not work with the default COCO json-files of detectron2. These json-files contain all annotations that are completed before the training starts. Because MaskAL involves an iterative train and annotation procedure, the default COCO json-files lack the desired format.
 <br/><br/>
 
-## How to use maskAL
+## How to use MaskAL
 Open a terminal (Ctrl+Alt+T):
 ```console
-(base) user@computer:~$ cd maskAL
-(base) user@computer:~/maskAL$ conda activate maskAL
-(maskAL) user@computer:~/maskAL$ python maskAL.py --config maskAL.yaml
+(base) user@computer:~$ cd maskal
+(base) user@computer:~/maskal$ conda activate maskAL
+(maskAL) user@computer:~/maskal$ python maskAL.py --config maskAL.yaml
 ```
 <br/>
 Change the following settings in the maskAL.yaml file: <br/>
@@ -111,4 +111,4 @@ Two software functions were inspired by the software of RovelMan: <br/>
 https://github.com/RovelMan/active-learning-framework<br/> <br/>
 
 ## Contact
-maskAL is developed and maintained by Pieter Blok. <br/> <br/>
+MaskAL is developed and maintained by Pieter Blok. <br/> <br/>
