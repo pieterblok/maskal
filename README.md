@@ -107,8 +107,10 @@ See our research article for more information or cross-referencing:
 Our software was forked from Detectron2 (https://github.com/facebookresearch/detectron2). As such, the software will be released under the [Apache 2.0 license](LICENSE). <br/> <br/>
 
 ## Acknowledgements
-Two software functions were inspired by the software of RovelMan: <br/>
-https://github.com/RovelMan/active-learning-framework<br/> <br/>
+The uncertainty calculation methods were inspired by the research of Doug Morrison: <br/>
+https://nikosuenderhauf.github.io/roboticvisionchallenges/assets/papers/CVPR19/rvc_4.pdf<br/><br/>
+Two software methods were inspired by the work of RovelMan: <br/>
+https://github.com/RovelMan/active-learning-framework<br/><br/> 
 
 ## Contact
 MaskAL is developed and maintained by Pieter Blok. <br/> <br/>
