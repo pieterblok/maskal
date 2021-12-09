@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-11-29 10:55:29
+# @Last Modified time: 2021-12-09 10:37:45
 
 import sys
 import io
@@ -22,6 +22,7 @@ import base64
 from tqdm import tqdm
 import xmltodict
 import logging
+from zipfile import ZipFile
 
 from detectron2 import model_zoo
 from detectron2.engine import DefaultPredictor
@@ -711,7 +712,7 @@ def create_json(rootdir, imgdir, images, classes, name):
         superclass = classes[k]
         writedata['categories'].append({"supercategory": superclass, "id": (k+1), "name": superclass})
 
-    annotation_id = 0
+    annotation_id = 1   ## see: https://github.com/cocodataset/cocoapi/issues/507
     output_file = name + ".json"
 
     print("")
@@ -993,6 +994,13 @@ def check_json_presence(config, imgdir, dataset, name, cfg=[]):
             diff_img_annot, cur_annot_diff = highlight_missing_annotations(annot_folder, cur_annot_diff)
             while len(diff_img_annot) > 0:
                 diff_img_annot, cur_annot_diff = highlight_missing_annotations(annot_folder, cur_annot_diff)
+
+            if config['export_format'] == 'cvat':
+                zipObj = ZipFile(os.path.join(annot_folder, 'cvat_annotations.zip'), 'w')
+                for file in os.listdir(annot_folder):
+                    if file.endswith(".xml"):
+                        zipObj.write(os.path.join(annot_folder, file))
+                zipObj.close()
             
             if config['export_format'] == 'supervisely':
                 print("Load the preprocessed folder '{:s}' into Supervisely \n\nAfter checking, copy-paste the updated json-annotations to folder '{:s}'\n".format(os.path.join(config['dataroot'], "out_supervisely"), annot_folder))
@@ -1037,10 +1045,14 @@ def write_labelme_annotations(write_dir, basename, class_names, masks, height, w
             groupid = 1
             masksel = maskstransposed[:,:,i] # select the individual masks
             class_name = class_names[i]
-            contours, hierarchy = cv2.findContours((masksel*255).astype(np.uint8),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-            cnt = np.concatenate(contours)
+            contours_unfiltered, hierarchy = cv2.findContours((masksel*255).astype(np.uint8),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+            contours = []
+            for cnts in range(len(contours_unfiltered)):
+                area = cv2.contourArea(contours_unfiltered[cnts])
+                if area > 50:
+                    contours.append(contours_unfiltered[cnts])
                
-            if cv2.contourArea(cnt) > 50:
+            if len(contours) > 0:
                 useful_masks = True
                 if len(contours) == 1:
                     segm = np.vstack(contours).squeeze()
@@ -1119,10 +1131,14 @@ def write_darwin_annotations(write_dir, basename, class_names, masks, height, wi
         for i in range (maskstransposed.shape[-1]):
             masksel = maskstransposed[:,:,i] # select the individual masks
             class_name = class_names[i]
-            contours, hierarchy = cv2.findContours((masksel*255).astype(np.uint8),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-            cnt = np.concatenate(contours)
+            contours_unfiltered, hierarchy = cv2.findContours((masksel*255).astype(np.uint8),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+            contours = []
+            for cnts in range(len(contours_unfiltered)):
+                area = cv2.contourArea(contours_unfiltered[cnts])
+                if area > 50:
+                    contours.append(contours_unfiltered[cnts])
                
-            if cv2.contourArea(cnt) > 50:
+            if len(contours) > 0:
                 useful_masks = True
                 if len(contours) == 1:
                     segm = np.vstack(contours).squeeze()
@@ -1190,10 +1206,14 @@ def write_cvat_annotations(write_dir, basename, class_names, masks, height, widt
         for i in range (maskstransposed.shape[-1]):
             masksel = maskstransposed[:,:,i] # select the individual masks
             class_name = class_names[i]
-            contours, hierarchy = cv2.findContours((masksel*255).astype(np.uint8),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-            cnt = np.concatenate(contours)
-
-            if cv2.contourArea(cnt) > 50:
+            contours_unfiltered, hierarchy = cv2.findContours((masksel*255).astype(np.uint8),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+            contours = []
+            for cnts in range(len(contours_unfiltered)):
+                area = cv2.contourArea(contours_unfiltered[cnts])
+                if area > 50:
+                    contours.append(contours_unfiltered[cnts])
+               
+            if len(contours) > 0:
                 useful_masks = True
                 if len(contours) == 1:
                     xmlobj = ET.SubElement(annot, "object")
@@ -1295,6 +1315,14 @@ def write_supervisely_annotations(write_dir, basename, class_names, masks, heigh
 
             time = datetime.datetime.now()
             time_str = str(time)[:-3].replace(' ','T') + "Z"
+
+            num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(masksel, 4, cv2.CV_32S)
+            for s in range(1, num_labels):
+                area = stats[s, cv2.CC_STAT_AREA]
+                if area <= 50:
+                    labels = np.where(labels==s, 0, labels)
+
+            masksel = np.where(labels > 0, 1, labels)
                
             if cv2.contourArea(cnt) > 50:
                 useful_masks = True
