@@ -1,6 +1,6 @@
 # Parameters for maskAL
 # python maskAL.py --config maskAL.yaml
-# explanation can be found here: https://git.wur.nl/blok012/maskAL
+# explanation can be found here: https://github.com/pieterblok/maskal
 
 # folders
 weightsroot: "./weights"

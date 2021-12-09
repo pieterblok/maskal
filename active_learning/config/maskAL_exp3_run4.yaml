@@ -1,6 +1,7 @@
 # Parameters for maskAL
-# python maskAL.py --config active_learning/config/maskAL.yaml
-# explanation can be found here: https://git.wur.nl/blok012/maskAL
+# git revert 0552850
+# python maskAL.py --config active_learning/config/maskAL_exp3_run4.yaml
+# explanation can be found here: https://github.com/pieterblok/maskal
 
 # folders
 weightsroot: "./weights"
@@ -8,7 +9,7 @@ resultsroot: "./results"
 dataroot: "./datasets/exp3/run4"
 traindir: "./datasets/train"
 valdir: "./datasets/val"
-testdir: "./datasets/test04"
+testdir: "./datasets/test03"
 
 # training-parameters
 cuda_visible_devices: '0'
