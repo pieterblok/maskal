@@ -101,7 +101,18 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
 ## Citation
 See our research article for more information or cross-referencing: 
-<br/> <br/>
+```BibTeX
+@misc{blok2021active,
+      title={Active learning with MaskAL reduces annotation effort for training Mask R-CNN}, 
+      author={Pieter M. Blok and Gert Kootstra and Hakim Elchaoui Elghor and Boubacar Diallo and Frits K. van Evert and Eldert J. van Henten},
+      year={2021},
+      eprint={2112.06586},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url = {https://arxiv.org/abs/2112.06586},
+}
+```
+<br/>
 
 ## License
 Our software was forked from Detectron2 (https://github.com/facebookresearch/detectron2). As such, the software will be released under the [Apache 2.0 license](LICENSE). <br/> <br/>
