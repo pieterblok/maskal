@@ -122,6 +122,8 @@ The uncertainty calculation methods were inspired by the research of Doug Morris
 https://nikosuenderhauf.github.io/roboticvisionchallenges/assets/papers/CVPR19/rvc_4.pdf<br/><br/>
 Two software methods were inspired by the work of RovelMan: <br/>
 https://github.com/RovelMan/active-learning-framework<br/><br/> 
+MaskAL uses the Bayesian Active Learning (BaaL) software: <br/>
+https://github.com/ElementAI/baal<br/><br/> 
 
 ## Contact
 MaskAL is developed and maintained by Pieter Blok. <br/> <br/>
