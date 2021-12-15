@@ -18,7 +18,7 @@ pretrained_weights: COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml
 
 # training-parameters
 cuda_visible_devices: '0'
-classes: ['healthy', 'damaged', 'matured', 'cateye', 'headrot']
+classes: ['broccoli', 'damaged', 'matured', 'cateye', 'headrot']
 transfer_learning_on_previous_models: True
 learning_rate: 0.01
 warmup_iterations: 500
