@@ -105,14 +105,14 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 ## Citation
 See our research article for more information or cross-referencing: 
 ```BibTeX
-@misc{blok2021active,
+@misc{blok2022active,
       title={Active learning with MaskAL reduces annotation effort for training Mask R-CNN}, 
       author={Pieter M. Blok and Gert Kootstra and Hakim Elchaoui Elghor and Boubacar Diallo and Frits K. van Evert and Eldert J. van Henten},
-      year={2021},
+      year={2022},
       eprint={2112.06586},
       archivePrefix={arXiv},
       primaryClass={cs.CV},
-      url = {https://arxiv.org/abs/2112.06586},
+      url={https://arxiv.org/abs/2112.06586},
 }
 ```
 <br/>
