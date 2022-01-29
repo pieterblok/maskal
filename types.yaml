@@ -4,11 +4,15 @@
 weightsroot: 'string'
 resultsroot: 'string'
 dataroot: 'string'
-use_initial_train_dir: 'boolean'
 initial_train_dir: 'string'
 traindir: 'string'
 valdir: 'string'
 testdir: 'string'
+
+# data options
+use_initial_train_dir: 'boolean'
+duplicate_initial_model_and_data: 'boolean'
+initial_train_file: 'string'
 
 # network parameters
 network_config: 'string'
@@ -43,7 +47,7 @@ nms_threshold: 'float'
 
 # active-learning sampling
 experiment_name: 'string'
-strategies: ['string', 'list']
+strategy: ['string', 'list']
 mode: ['string', 'list']
 initial_datasize: 'integer'
 pool_size: ['integer', 'list']

@@ -51,11 +51,11 @@ Change the following settings in the maskAL.yaml file: <br/>
 | weightsroot	        | The file directory where the weight-files are stored											|
 | resultsroot		| The file directory where the result-files are stored 											|
 | dataroot	 	| The root directory where all image-files are stored											|
-| use_initial_train_dir | Set this to **True** when you want to start the active-learning from an initial training dataset. When **False**, the initial dataset of size **initial_datasize** is randomly sampled from the **traindir** 																	|
 | initial_train_dir     | When use_initial_train_dir is activated: the file directory where the initial training images and annotations are stored		|
 | traindir	 	| The file directory where the training images and annotations are stored								|
 | valdir	 	| The file directory where the validation images and annotations are stored								|
 | testdir	 	| The file directory where the test images and annotations are stored									|
+| use_initial_train_dir | Set this to **True** when you want to start the active-learning from an initial training dataset. When **False**, the initial dataset of size **initial_datasize** is randomly sampled from the **traindir** 																	|
 | network_config	| The Mask R-CNN configuration-file (.yaml) file (see the folder './configs')								|
 | pretrained_weights	| The pretrained weights to start the active-learning. Either specify the **network_config** (.yaml) or a custom weights-file (.pth or .pkl)|
 | cuda_visible_devices 	| The identifiers of the CUDA device(s) you want to use for training and sampling (in string format, for example: '0,1')		|

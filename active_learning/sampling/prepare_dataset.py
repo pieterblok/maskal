@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-12-09 13:55:46
+# @Last Modified time: 2022-01-27 15:00:20
 
 import sys
 import io
@@ -1394,6 +1394,20 @@ def calculate_iterations(config, dataset_dicts_train):
         max_iterations = config['train_iterations_base'] + ((div_factor - 1) * config['train_iterations_step_size'])
     steps = [int(s * max_iterations) for s in config['step_ratios']]
     return int(max_iterations), steps
+
+
+def read_train_file(txt_file):
+    initial_train_files = []
+    txtfile = open(txt_file, 'r')
+    lines = txtfile.readlines()
+    
+    for line in lines:
+        if line != "\n":
+            full_line = line.strip()
+            train_file = full_line.split(",")[0]
+            initial_train_files.append(train_file)
+    txtfile.close()
+    return initial_train_files 
     
 
 def prepare_all_dataset_randomly(rootdir, imgdir, classes, train_val_test_split, initial_datasize):
@@ -1477,7 +1491,31 @@ def prepare_initial_dataset(config):
     except Exception as e:
         print_exception(e)
         logger.error("Cannot create initial-datasets")
-        sys.exit("Closing application")     
+        sys.exit("Closing application")
+
+
+def prepare_initial_dataset_from_list(config, train_list):
+    try:
+        for i, (imgdir, name) in enumerate(zip([config['traindir'], config['valdir'], config['testdir']], ['train', 'val', 'test'])):
+            print("")
+            print("Processing {:s}-dataset: {:s}".format(name, imgdir))
+            rename_xml_files(imgdir)
+            images, annotations = list_files(imgdir)
+            print("{:d} images found!".format(len(images)))
+            print("{:d} annotations found!".format(len(annotations)))
+            write_file(config['dataroot'], images, name)
+
+            if name == "train":
+                check_json_presence(config, imgdir, train_list, name)
+                create_json(config['dataroot'], imgdir, train_list, config['classes'], name)
+            else:
+                check_json_presence(config, imgdir, images, name)
+                create_json(config['dataroot'], imgdir, images, config['classes'], name)
+
+    except Exception as e:
+        print_exception(e)
+        logger.error("Cannot create initial-datasets")
+        sys.exit("Closing application")      
 
 
 def update_train_dataset(config, cfg, train_list):
