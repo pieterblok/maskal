@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2021-11-29 09:27:42
+# @Last Modified time: 2022-02-22 18:47:55
 
 ## Use a trained model to auto-annotate unlabelled images
 
@@ -11,6 +11,7 @@ import numpy as np
 import os
 import cv2
 from tqdm import tqdm
+from zipfile import ZipFile
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -27,6 +28,14 @@ from detectron2.data import MetadataCatalog
 
 ## libraries for preparing the datasets
 from active_learning.sampling import list_files, visualize_mrcnn, write_cvat_annotations, write_darwin_annotations, write_labelme_annotations, write_supervisely_annotations, mkdir_supervisely
+
+
+def create_zipfile(imgdir):
+    zipObj = ZipFile(os.path.join(imgdir, 'cvat_annotations.zip'), 'w')
+    for file in os.listdir(imgdir):
+        if file.endswith(".xml"):
+            zipObj.write(os.path.join(imgdir, file))
+    zipObj.close()
 
 
 if __name__ == "__main__":
@@ -104,6 +113,7 @@ if __name__ == "__main__":
 
         if opt.export_format == "cvat":
             write_cvat_annotations(opt.img_dir, basename, class_names, masks, height, width)
+            create_zipfile(opt.img_dir)
 
         if opt.export_format == "darwin":
             write_darwin_annotations(opt.img_dir, basename, class_names, masks, height, width)

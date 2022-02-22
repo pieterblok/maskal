@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2022-01-27 15:00:20
+# @Last Modified time: 2022-02-22 18:57:15
 
 import sys
 import io
@@ -10,6 +10,7 @@ import os, traceback
 import numpy as np
 import shutil
 import cv2
+from scipy.interpolate import splprep, splev
 from PIL import Image
 import json
 import xml.etree.cElementTree as ET
@@ -1027,6 +1028,23 @@ def check_json_presence(config, imgdir, dataset, name, cfg=[]):
             shutil.rmtree(annot_folder)
 
 
+def smooth_contours(contours):
+    ## thanks to: https://agniva.me/scipy/2016/10/25/contour-smoothing.html
+    smoothened = []
+
+    for contour in contours:
+        x,y = contour.T
+        x = x.tolist()[0]
+        y = y.tolist()[0]
+        tck, u = splprep([x,y], u=None, s=1.0, per=1)
+        u_new = np.linspace(u.min(), u.max(), 50) ## maximum number of contour points: 50
+        x_new, y_new = splev(u_new, tck, der=0)
+        res_array = [[[int(i[0]), int(i[1])]] for i in zip(x_new,y_new)]
+        smoothened.append(np.asarray(res_array, dtype=np.int32))
+
+    return smoothened
+
+
 def write_labelme_annotations(write_dir, basename, class_names, masks, height, width):
     masks = masks.astype(np.uint8)
 
@@ -1051,6 +1069,11 @@ def write_labelme_annotations(write_dir, basename, class_names, masks, height, w
                 area = cv2.contourArea(contours_unfiltered[cnts])
                 if area > 50:
                     contours.append(contours_unfiltered[cnts])
+
+            try:
+                contours = smooth_contours(contours)
+            except:
+                pass
                
             if len(contours) > 0:
                 useful_masks = True
@@ -1137,6 +1160,11 @@ def write_darwin_annotations(write_dir, basename, class_names, masks, height, wi
                 area = cv2.contourArea(contours_unfiltered[cnts])
                 if area > 50:
                     contours.append(contours_unfiltered[cnts])
+
+            try:
+                contours = smooth_contours(contours)
+            except:
+                pass
                
             if len(contours) > 0:
                 useful_masks = True
@@ -1212,6 +1240,11 @@ def write_cvat_annotations(write_dir, basename, class_names, masks, height, widt
                 area = cv2.contourArea(contours_unfiltered[cnts])
                 if area > 50:
                     contours.append(contours_unfiltered[cnts])
+
+            try:
+                contours = smooth_contours(contours)
+            except:
+                pass
                
             if len(contours) > 0:
                 useful_masks = True
