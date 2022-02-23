@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2022-02-22 18:57:15
+# @Last Modified time: 2022-02-23 13:33:35
 
 import sys
 import io
@@ -85,6 +85,42 @@ def list_files(rootdir):
         annotations.sort()
 
     return images, annotations
+
+
+def find_tiff_files(traindir, valdir=[], testdir=[], initial_traindir=[]):
+    tiff_images = []
+    tiff_annotations = []
+
+    all_dirs = [traindir, valdir, testdir, initial_traindir]
+    for d in range(len(all_dirs)):
+        if all_dirs[d] != []:
+            if os.path.isdir(all_dirs[d]):
+                for root, dirs, files in list(os.walk(all_dirs[d])):
+                    for name in files:
+                        subdir = root.split(all_dirs[d])
+                        all('' == s for s in subdir)
+                        
+                        if subdir[1].startswith('/'):
+                            subdirname = subdir[1][1:]
+                        else:
+                            subdirname = subdir[1]
+
+                        if name.lower().endswith(".tiff") or name.lower().endswith(".tif"):
+                            if all('' == s for s in subdir):
+                                tiff_images.append(os.path.join(all_dirs[d], name))
+                            else:
+                                tiff_images.append(os.path.join(all_dirs[d], subdirname, name))
+
+                        if name.endswith(".tiff.json") or name.endswith(".tif.json"):
+                            if all('' == s for s in subdir):
+                                tiff_annotations.append(os.path.join(all_dirs[d], name))
+                            else:
+                                tiff_annotations.append(os.path.join(all_dirs[d], subdirname, name))
+            
+                tiff_images.sort()
+                tiff_annotations.sort()
+
+    return tiff_images, tiff_annotations
 
 
 def matching_images_and_annotations(rootdir):
@@ -997,11 +1033,7 @@ def check_json_presence(config, imgdir, dataset, name, cfg=[]):
                 diff_img_annot, cur_annot_diff = highlight_missing_annotations(annot_folder, cur_annot_diff)
 
             if config['export_format'] == 'cvat':
-                zipObj = ZipFile(os.path.join(annot_folder, 'cvat_annotations.zip'), 'w')
-                for file in os.listdir(annot_folder):
-                    if file.endswith(".xml"):
-                        zipObj.write(os.path.join(annot_folder, file))
-                zipObj.close()
+                create_zipfile(annot_folder)
             
             if config['export_format'] == 'supervisely':
                 print("Load the preprocessed folder '{:s}' into Supervisely \n\nAfter checking, copy-paste the updated json-annotations to folder '{:s}'\n".format(os.path.join(config['dataroot'], "out_supervisely"), annot_folder))
@@ -1015,7 +1047,11 @@ def check_json_presence(config, imgdir, dataset, name, cfg=[]):
         images, annotations = list_files(annot_folder)
         for a in range(len(annotations)):
             annotation = annotations[a]
-            subdirname = [os.path.dirname(imgb) for imgb in img_basenames if os.path.splitext(annotation)[0] in imgb]
+            if config['export_format'] == 'supervisely':
+                subdirname = [os.path.dirname(imgb) for imgb in img_basenames if os.path.splitext(os.path.splitext(annotation)[0])[0] in imgb]
+            else:
+                subdirname = [os.path.dirname(imgb) for imgb in img_basenames if os.path.splitext(annotation)[0] in imgb]
+
             if subdirname == [''] or subdirname == []:
                 shutil.copyfile(os.path.join(annot_folder, annotation), os.path.join(imgdir, annotation))
             else:
@@ -1316,6 +1352,14 @@ def write_cvat_annotations(write_dir, basename, class_names, masks, height, widt
             tree.write(os.path.join(write_dir, xmln))
 
 
+def create_zipfile(annot_folder):
+    zipObj = ZipFile(os.path.join(annot_folder, 'cvat_annotations.zip'), 'w')
+    for file in os.listdir(annot_folder):
+        if file.endswith(".xml"):
+            zipObj.write(os.path.join(annot_folder, file))
+    zipObj.close()
+
+
 def write_supervisely_annotations(write_dir, basename, class_names, masks, height, width, meta_json):
     with open(meta_json, 'r') as json_file:
         data = json.load(json_file)
@@ -1389,6 +1433,25 @@ def write_supervisely_annotations(write_dir, basename, class_names, masks, heigh
         if useful_masks:
             with open(os.path.join(write_dir, jn), 'w') as outfile:
                 json.dump(writedata, outfile)
+
+
+def convert_tiffs(tiff_files, tiff_annotations=[]):
+    print("\nConverting the tif/tiff images to png")
+    for tf in tqdm(range(len(tiff_files))):
+        img = cv2.imread(tiff_files[tf])
+        basename = os.path.splitext(tiff_files[tf])[0]
+        writename = basename + '.png'
+        cv2.imwrite(writename, img)
+        os.remove(tiff_files[tf])
+
+    print("\nConverting the tif/tiff annotations")
+    for ta in tqdm(range(len(tiff_annotations))):
+        annot_file = tiff_annotations[ta]
+        if annot_file.lower().endswith(".tiff.json"):
+            output_json = annot_file.split(".tiff.json")[0] + ".png.json"
+        if annot_file.lower().endswith(".tif.json"):
+            output_json = annot_file.split(".tif.json")[0] + ".png.json"
+        os.rename(annot_file, output_json)
 
 
 ## the function below is heavily inspired by the function "repeat_factors_from_category_frequency" in maskAL/detectron2/data/samplers/distributed_sampler.py

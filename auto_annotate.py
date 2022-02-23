@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-25 18:48:22
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2022-02-22 18:47:55
+# @Last Modified time: 2022-02-23 13:40:38
 
 ## Use a trained model to auto-annotate unlabelled images
 
@@ -27,15 +27,7 @@ from detectron2.utils.visualizer import Visualizer
 from detectron2.data import MetadataCatalog
 
 ## libraries for preparing the datasets
-from active_learning.sampling import list_files, visualize_mrcnn, write_cvat_annotations, write_darwin_annotations, write_labelme_annotations, write_supervisely_annotations, mkdir_supervisely
-
-
-def create_zipfile(imgdir):
-    zipObj = ZipFile(os.path.join(imgdir, 'cvat_annotations.zip'), 'w')
-    for file in os.listdir(imgdir):
-        if file.endswith(".xml"):
-            zipObj.write(os.path.join(imgdir, file))
-    zipObj.close()
+from active_learning.sampling import list_files, visualize_mrcnn, write_cvat_annotations, write_darwin_annotations, write_labelme_annotations, write_supervisely_annotations, mkdir_supervisely, find_tiff_files, convert_tiffs, create_zipfile
 
 
 if __name__ == "__main__":
@@ -54,6 +46,14 @@ if __name__ == "__main__":
     opt = parser.parse_args()
     print(opt)
     print()
+
+    if opt.export_format == "supervisely":
+        tiff_images, _ = find_tiff_files(opt.img_dir)
+        if tiff_images != []:
+            print("\n{:d} images found with .tiff or .tif extension: unfortunately Supervisely does not support these extensions".format(len(tiff_images)))
+            input("Press Enter to automatically convert the {:d} images to .png extension".format(len(tiff_images)))
+            convert_tiffs(tiff_images)
+        out_ann_dir = mkdir_supervisely(opt.img_dir, os.path.dirname(opt.img_dir), opt.supervisely_meta_json)
 
     use_coco = False
     images, annotations = list_files(opt.img_dir)
@@ -79,9 +79,6 @@ if __name__ == "__main__":
     checkpointer.load(cfg.MODEL.WEIGHTS)
 
     predictor = DefaultPredictor(cfg)
-
-    if opt.export_format == "supervisely":
-        out_ann_dir = mkdir_supervisely(opt.img_dir, os.path.dirname(opt.img_dir), opt.supervisely_meta_json)
 
     for i in tqdm(range(len(images))):
         imgname = images[i]
@@ -113,7 +110,6 @@ if __name__ == "__main__":
 
         if opt.export_format == "cvat":
             write_cvat_annotations(opt.img_dir, basename, class_names, masks, height, width)
-            create_zipfile(opt.img_dir)
 
         if opt.export_format == "darwin":
             write_darwin_annotations(opt.img_dir, basename, class_names, masks, height, width)
@@ -123,3 +119,8 @@ if __name__ == "__main__":
 
         if opt.export_format == "supervisely":
             write_supervisely_annotations(out_ann_dir, basename, class_names, masks, height, width, opt.supervisely_meta_json)
+
+
+    ## zip the cvat xml-files so it's easier to do the export
+    if opt.export_format == "cvat":
+        create_zipfile(opt.img_dir)
