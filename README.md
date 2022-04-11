@@ -103,16 +103,30 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 <br/> <br/>
 
 ## Citation
-See our research article for more information or cross-referencing: 
+See our research article on **arXiv** and **Computers and Electronics in Agriculture** for more information: 
 ```BibTeX
-@misc{blok2022active,
-      title={Active learning with MaskAL reduces annotation effort for training Mask R-CNN}, 
-      author={Pieter M. Blok and Gert Kootstra and Hakim Elchaoui Elghor and Boubacar Diallo and Frits K. van Evert and Eldert J. van Henten},
-      year={2022},
-      eprint={2112.06586},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV},
-      url={https://arxiv.org/abs/2112.06586},
+@misc{blok2021active,
+  title = {Active learning with MaskAL reduces annotation effort for training Mask R-CNN},
+  author = {Blok, Pieter M. and Kootstra, Gert and Elghor, Hakim Elchaoui and Diallo, Boubacar and van Evert, Frits K. and van Henten, Eldert J.},
+  year = {2021},
+  doi = {10.48550/ARXIV.2112.06586},
+  url = {https://arxiv.org/abs/2112.06586},
+  publisher = {arXiv},
+  copyright = {Creative Commons Attribution Share Alike 4.0 International},
+  keywords = {Computer Vision and Pattern Recognition (cs.CV), FOS: Computer and information sciences, FOS: Computer and information sciences}
+}
+```
+```BibTeX
+@article{blok2022106917,
+  title = {Active learning with MaskAL reduces annotation effort for training Mask R-CNN on a broccoli dataset with visually similar classes},
+  author = {Pieter M. Blok and Gert Kootstra and Hakim Elchaoui Elghor and Boubacar Diallo and Frits K. {van Evert} and Eldert J. {van Henten}},
+  journal = {Computers and Electronics in Agriculture},
+  volume = {197},
+  pages = {106917},
+  year = {2022},
+  issn = {0168-1699},
+  doi = {10.1016/j.compag.2022.106917},
+  url = {https://www.sciencedirect.com/science/article/pii/S0168169922002344}
 }
 ```
 <br/>
