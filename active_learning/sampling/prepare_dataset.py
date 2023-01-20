@@ -1,7 +1,7 @@
 # @Author: Pieter Blok
 # @Date:   2021-03-26 14:30:31
 # @Last Modified by:   Pieter Blok
-# @Last Modified time: 2022-02-23 13:33:35
+# @Last Modified time: 2023-01-20 13:59:25
 
 import sys
 import io
@@ -527,7 +527,7 @@ def process_supervisely_json(jsonfile, classnames):
             run_further = False
 
         if run_further:
-            if 'bitmap' in p:
+            if p['geometryType'] == 'bitmap':
                 if 'data' in p['bitmap']:
                     ## https://legacy.docs.supervise.ly/ann_format/
                     final_mask = np.zeros((data['size']['height'], data['size']['width']), dtype=bool)
@@ -561,6 +561,14 @@ def process_supervisely_json(jsonfile, classnames):
                             points.append(int(contour[h][0]))
                             points.append(int(contour[h][1]))
                         masks[fill_id].append(points)
+
+            if p['geometryType'] == 'polygon':
+                exterior_points = p['points']['exterior']
+                points = []
+                for h in range(len(exterior_points)):
+                    points.append(exterior_points[h][0])
+                    points.append(exterior_points[h][1])
+                masks[fill_id].append(points)
 
             crowd_ids[fill_id] = 0
             status = "successful"
@@ -809,17 +817,17 @@ def create_json(rootdir, imgdir, images, classes, name):
                     ## supervisely               
                     if 'objects' in data:
                         if len(data['objects']) > 0:
-                            bitmaps = np.zeros(len(data['objects']), dtype=bool)
+                            bitmap_or_poly = np.zeros(len(data['objects']), dtype=bool)
                             for ob in range(len(data['objects'])):
                                 obj = data['objects'][ob]
-                                if obj['geometryType'] == "bitmap":
-                                    bitmaps[ob] = True
+                                if obj['geometryType'] == "bitmap" or obj['geometryType'] == "polygon":
+                                    bitmap_or_poly[ob] = True
 
-                        if all(bitmaps): 
+                        if all(bitmap_or_poly): 
                             annot_format = 'supervisely'
                             write = True
                         else:
-                            logger.error("Only bitmap-annotations are supported for Supervisely")
+                            logger.error("Only bitmap-annotations or polygon-annotations are supported for Supervisely")
                 except:
                     continue
 
