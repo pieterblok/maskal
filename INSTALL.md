@@ -33,7 +33,7 @@ export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64${LD_LIBRARY_PATH:+:${LD_LIBRAR
 
 
 ## 1b.) Install CUDA 11.1.1 (if not yet installed) 
-Tested on: Ubuntu 20.04, CUDA: 11.1.1 (11.1.105-1)<br/> 
+Tested on: Ubuntu 20.04, and 22.04, CUDA: 11.1.1 (11.1.105-1)<br/> 
 
 **1b.1) Install NVIDIA drivers (using the terminal):** 
 - sudo add-apt-repository ppa:graphics-drivers/ppa
@@ -64,50 +64,46 @@ export LD_LIBRARY_PATH=/usr/local/cuda-11.1/lib64${LD_LIBRARY_PATH:+:${LD_LIBRAR
 
 
 ## 2.) Install MaskAL in a virtual environment (using Anaconda)
-Tested with: Pytorch 1.8.0 & torchvision 0.9.0 (Ubuntu 16.04/18.04 and CUDA 10.1) and Pytorch 1.7.1 & torchvision 0.8.2 (Ubuntu 20.04 and CUDA 11.1)<br/>
+Tested with: Pytorch 1.8.0 & torchvision 0.9.0 (Ubuntu 16.04/18.04 and CUDA 10.1), Pytorch 1.7.1 & torchvision 0.8.2 (Ubuntu 20.04 and CUDA 11.1), Pytorch 1.9.0 & torchvision 0.10.0 (Ubuntu 22.04 and CUDA 11.1) <br/>
 
 **2.1) Download and install Anaconda:**
 - download anaconda: https://www.anaconda.com/distribution/#download-section (python 3.x version)
 - install anaconda (using the terminal, cd to the directory where the file has been downloaded): bash Anaconda3-2019.10-Linux-x86_64.sh <br/> <br/>
 
-**2.2) Make a virtual environment (called maskAL) using the terminal:**
-- conda create --name maskAL python=3.8 pip
-- conda activate maskAL <br/> <br/>
+**2.2) Make a virtual environment (called maskal) using the terminal:**
+- conda create --name maskal python=3.9 pip
+- conda activate maskal <br/> <br/>
 
-**2.3) Download the code repository:**
+**2.3) Downgrade setuptools, to prevent this [error](https://github.com/facebookresearch/detectron2/issues/3811):**
+- pip uninstall setuptools
+- pip install setuptools==59.5.0 <br/> <br/>
+
+**2.4) Download the code repository:**
 - git clone https://github.com/pieterblok/maskal.git
 - cd maskal <br/> <br/>
 
-**2.4) Install the required software libraries (in the maskAL virtual environment, using the terminal):**
+**2.5) Install the required software libraries (in the maskal virtual environment, using the terminal):**
 - *for cuda 10.1:* pip install -U torch==1.8.0 torchvision==0.9.0 -f https://download.pytorch.org/whl/cu101/torch_stable.html 
 - *for cuda 11.1:* pip install -U torch==1.7.1 torchvision==0.8.2 -f https://download.pytorch.org/whl/cu111/torch_stable.html
-- pip install cython pyyaml==5.1
-- pip install -U 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'
+- *for cuda 11.1:* pip install -U torch==1.9.0 torchvision==0.10.0 -f https://download.pytorch.org/whl/cu111/torch_stable.html
+- pip install pillow==9.0.1
+- pip install cython
 - pip install jupyter
 - pip install opencv-python
 - pip install -U fvcore
-- pip install nbformat==4.4
 - pip install scikit-image matplotlib imageio
 - pip install black isort flake8 flake8-bugbear flake8-comprehensions
 - pip install -e .
-- pip install scikit-learn==0.22.2
-- pip install pandas
-- pip install h5py
-- pip install structlog
-- pip install pytorch-lightning==0.8.5
-- pip install transformers
-- pip install datasets
-- pip install onnx
 - pip install baal 
 - pip install xmltodict 
 - pip install seaborn 
 - pip install statsmodels 
-- pip install cerberus 
+- pip install cerberus
 - pip install darwin-py <br/> <br/>
 
-**2.5) Reboot/restart the computer (sudo reboot)** <br/> <br/>
+**2.6) Reboot/restart the computer (sudo reboot)** <br/> <br/>
 
-**2.6) Check if Pytorch links with CUDA (in the maskAL virtual environment, using the terminal):**
+**2.7) Check if Pytorch links with CUDA (in the maskal virtual environment, using the terminal):**
 - python
 - import torch
 - torch.version.cuda *(should print 10.1 or 11.1)*
@@ -115,7 +111,7 @@ Tested with: Pytorch 1.8.0 & torchvision 0.9.0 (Ubuntu 16.04/18.04 and CUDA 10.1
 - torch.cuda.get_device_name(0) *(should print the name of the first GPU)*
 - quit() <br/> <br/>
 
-**2.7) Check if detectron2 is found in python (in the maskAL virtual environment, using the terminal):**
+**2.8) Check if detectron2 is found in python (in the maskal virtual environment, using the terminal):**
 - python
 - import detectron2 *(should not print an error)*
 - from detectron2 import model_zoo *(should not print an error)*
