@@ -20,7 +20,8 @@ The figure below shows the performance improvement of MaskAL on our dataset. By 
 [![IMAGE ALT TEXT HERE](./demo/video_screenshot.png?raw=true)](https://www.youtube.com/watch?v=OS2EjuNLTcQ) <br/> <br/>
 
 ## Installation
-See [INSTALL.md](INSTALL.md)
+Linux/Ubuntu: [INSTALL.md](INSTALL.md)<br/><br/>
+Windows: [INSTALL_Windows.md](INSTALL_Windows.md)
 <br/> <br/>
 
 ## Data preparation and training
